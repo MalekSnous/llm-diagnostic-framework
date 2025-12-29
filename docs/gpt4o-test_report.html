@@ -1,0 +1,335 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Diagnostic Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric {
+            display: inline-block;
+            margin: 10px 20px 10px 0;
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 5px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .recommendation {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #27ae60;
+        }
+        .warning {
+            color: #f39c12;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 LLM Diagnostic Report</h1>
+    
+    <div class="section">
+        <h2>Summary</h2>
+        <div class="metric">
+            <div class="metric-label">Report Generated</div>
+            <div class="metric-value">2025-12-29 13:02:50</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Model Tested</div>
+            <div class="metric-value">gpt-4o</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Total Tests</div>
+            <div class="metric-value">5</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Overall Success Rate</div>
+            <div class="metric-value success">87.5%</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Total Cost</div>
+            <div class="metric-value">$105.0700</div>
+        </div>
+    </div>
+    
+    
+        <div class="section">
+            <h2>🧪 Hallucination Patterns</h2>
+            <p><em>Tests tendency to fabricate information and misuse context</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value error">37.5%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">8</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$7.4300</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">2278ms</div>
+            </div>
+            
+            <div class="recommendation"><strong>⚠️ Issues Detected:</strong><ul><li>Model fabricates information about non-existent entities. For factual tasks, use retrieval-augmented generation (RAG) with verified sources.</li><li>Model is susceptible to context pollution. Add explicit instructions to ignore irrelevant information and cite sources.</li><li>Model accepts false premises in questions. Add critical thinking instructions: 'Challenge assumptions in the question.'</li></ul></div>
+            
+            <p><strong>Explanation:</strong> LLMs are trained to maximize fluency and coherence, not factual accuracy. When uncertain, they generate plausible-sounding information rather than expressing uncertainty. This is the hallucination problem.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Knowledge Boundaries</h2>
+            <p><em>Tests knowledge cutoff, rare facts, and domain expertise</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value success">100.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">10</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$6.9625</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">1586ms</div>
+            </div>
+            
+            
+            
+            <p><strong>Explanation:</strong> LLM knowledge is constrained by: (1) training data cutoff, (2) frequency bias (rare facts underrepresented), and (3) domain coverage (specialized knowledge often missing).</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Reasoning Depth Limits</h2>
+            <p><em>Tests multi-hop reasoning and logical depth limits</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value success">100.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">13</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$10.9675</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">1607ms</div>
+            </div>
+            
+            
+            
+            <p><strong>Explanation:</strong> Transformers process sequences token by token without explicit symbolic reasoning mechanisms. Multi-hop reasoning requires maintaining and manipulating abstract representations, which becomes unreliable beyond a certain depth.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Structure Validation</h2>
+            <p><em>Tests ability to generate valid structured outputs</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value success">100.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">8</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$10.4275</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">2009ms</div>
+            </div>
+            
+            
+            
+            <p><strong>Explanation:</strong> LLMs generate tokens sequentially without built-in structure validation. They learn formatting patterns from training data but cannot guarantee syntactic correctness. Structured output APIs (when available) solve this by constraining the generation space.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Context Window Limits</h2>
+            <p><em>Tests attention degradation in long contexts</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value success">100.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">15</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$69.2825</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">741ms</div>
+            </div>
+            
+            
+            
+            <p><strong>Explanation:</strong> Transformer attention weights decay with distance. As context grows, the model allocates less attention to tokens far from the current position, leading to information loss.</p>
+        </div>
+        
+    
+    <div class='section'><h2>🚀 Improvement Strategies</h2>
+
+        <h3>📈 Prompt Engineering</h3>
+        <p><em></em></p>
+        
+        <div class="metric">
+            <div class="metric-label">Total Cost</div>
+            <div class="metric-value">$72.0725</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Time</div>
+            <div class="metric-value">12.5s</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Accuracy Improvement</div>
+            <div class="metric-value success">+100.0%</div>
+        </div>
+        
+        <table><tr><th>Metric</th><th>Baseline</th><th>Improved</th><th>Delta</th></tr><tr><td>Accuracy</td><td>0.000</td><td>1.000</td><td class='success'>+1.000</td></tr><tr><td>Total_cost</td><td>0.000</td><td>72.072</td><td class='success'>+72.072</td></tr></table>
+        
+
+        <h3>📈 RAG System</h3>
+        <p><em></em></p>
+        
+        <div class="metric">
+            <div class="metric-label">Total Cost</div>
+            <div class="metric-value">$69.3825</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Time</div>
+            <div class="metric-value">53.8s</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Accuracy Improvement</div>
+            <div class="metric-value success">+100.0%</div>
+        </div>
+        
+        <table><tr><th>Metric</th><th>Baseline</th><th>Improved</th><th>Delta</th></tr><tr><td>Accuracy</td><td>0.000</td><td>1.000</td><td class='success'>+1.000</td></tr><tr><td>Avg_retrieved</td><td>0.000</td><td>0.000</td><td class=''>+0.000</td></tr></table>
+        
+</div>
+    
+    <div class="section">
+        <h2>📊 Visualizations</h2>
+        <div id="success-rate-chart"></div>
+        <div id="cost-comparison-chart"></div>
+    </div>
+    
+    <div class="section">
+        <h2>💡 Key Recommendations</h2>
+        <div class="recommendation"><strong>1.</strong> Model fabricates information about non-existent entities. For factual tasks, use retrieval-augmented generation (RAG) with verified sources.</div><div class="recommendation"><strong>2.</strong> Model is susceptible to context pollution. Add explicit instructions to ignore irrelevant information and cite sources.</div><div class="recommendation"><strong>3.</strong> Model accepts false premises in questions. Add critical thinking instructions: 'Challenge assumptions in the question.'</div><div class="recommendation"><strong>4.</strong> Model rarely expresses uncertainty (0.0%). This increases hallucination risk. Use temperature=0 and add uncertainty prompts.</div>
+    </div>
+    
+    <script>
+        
+    // Success Rate Chart
+    var successData = [{
+        x: ["Hallucination Patterns", "Knowledge Boundaries", "Reasoning Depth Limits", "Structure Validation", "Context Window Limits"],
+        y: [37.5, 100.0, 100.0, 100.0, 100.0],
+        type: 'bar',
+        marker: {
+            color: ["#e74c3c", "#27ae60", "#27ae60", "#27ae60", "#27ae60"]
+        }
+    }];
+    
+    var successLayout = {
+        title: 'Success Rate by Test',
+        yaxis: {title: 'Success Rate (%)'}
+    };
+    
+    Plotly.newPlot('success-rate-chart', successData, successLayout);
+    
+    // Cost Comparison Chart
+    var costData = [{
+        x: ["Hallucination Patterns", "Knowledge Boundaries", "Reasoning Depth Limits", "Structure Validation", "Context Window Limits"],
+        y: [7.43, 6.9625, 10.967500000000001, 10.4275, 69.2825],
+        type: 'bar',
+        marker: {color: '#3498db'}
+    }];
+    
+    var costLayout = {
+        title: 'Cost by Test',
+        yaxis: {title: 'Cost (USD)'}
+    };
+    
+    Plotly.newPlot('cost-comparison-chart', costData, costLayout);
+    
+    </script>
+</body>
+</html>

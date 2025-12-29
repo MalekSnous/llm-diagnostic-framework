@@ -1,0 +1,358 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>medical_entity_extraction - Case Study Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .metadata {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .metadata-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .metadata-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        
+        .metadata-value {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .positive {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .negative {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .success {
+            background-color: #d4edda;
+        }
+        
+        .failure {
+            background-color: #f8d7da;
+        }
+        
+        .test-input, .test-output {
+            font-size: 0.9em;
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        
+        .recommendation {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 5px;
+        }
+        
+        .recommendation h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+            border-top: 2px solid #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 medical_entity_extraction</h1>
+            <p class="subtitle">Case Study Report</p>
+        </div>
+        
+        <div class="metadata">
+            <div class="metadata-grid">
+                <div class="metadata-item">
+                    <span class="metadata-label">Model</span>
+                    <span class="metadata-value">gpt-4o-mini</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Date</span>
+                    <span class="metadata-value">2025-12-28 23:43</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Baseline Accuracy</span>
+                    <span class="metadata-value">75.6%</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Best Improvement</span>
+                    <span class="metadata-value positive">
+                        -4.6%
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2>📈 Results Summary</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Strategy</th>
+                            <th>Accuracy</th>
+                            <th>Improvement</th>
+                            <th>Cost</th>
+                            <th>Cost per Point</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+            <tr>
+                <td><strong>Baseline (Zero-shot)</strong></td>
+                <td>75.6%</td>
+                <td>-</td>
+                <td>$0.4074</td>
+                <td>-</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Prompt Engineering</strong></td>
+                <td>71.0%</td>
+                <td class="negative">-4.6%</td>
+                <td>$0.2448</td>
+                <td>$0.00</td>
+            </tr>
+            
+            <tr>
+                <td><strong>RAG System</strong></td>
+                <td>66.9%</td>
+                <td class="negative">-8.8%</td>
+                <td>$0.3407</td>
+                <td>$0.00</td>
+            </tr>
+            
+                    </tbody>
+                </table>
+            </div>
+            
+            
+            <div class="section">
+                <h2>📋 Test Cases Details</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Input</th>
+                            <th>Expected</th>
+                            <th>Baseline Prediction</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                <tr>
+                    <td>1</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: Patient John Doe, 45 years old,...</td>
+                    <td class="test-output">John Doe, hypertension, type 2 diabetes, metformin</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>2</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: Jane Smith, female, 32, diagnos...</td>
+                    <td class="test-output">Jane Smith, asthma, albuterol</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>3</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: Robert Johnson, 67, admitted wi...</td>
+                    <td class="test-output">Robert Johnson, acute myocardial infarction, angioplasty</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>4</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: Mary Brown, 28, pregnant, gesta...</td>
+                    <td class="test-output">Mary Brown, pregnant, gestational diabetes, insulin</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>5</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: Patient presents with severe mi...</td>
+                    <td class="test-output">migraine, sumatriptan</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>6</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: Pt c/o CP, h/o MI 2y ago. PMH: ...</td>
+                    <td class="test-output">chest pain, myocardial infarction, hypertension, diabetes, hyperlipidemia, aspirin, metoprolol, lisinopril, atorvastatin</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>7</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: 36F G2P1 at 38w presents c/ ROM...</td>
+                    <td class="test-output">gravida 2 para 1, 38 weeks, rupture of membranes, fetal heart rate, cervix, electronic fetal monitoring</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>8</td>
+                    <td class="test-input">Extract medical entities (conditions, medications, procedures) from: CXR shows R lower lobe infiltra...</td>
+                    <td class="test-output">chest x-ray, right lower lobe, infiltrate, community-acquired pneumonia, Levaquin</td>
+                    <td class="success">
+                        N/A...
+                    </td>
+                </tr>
+                
+                    </tbody>
+                </table>
+            </div>
+            
+            
+            <div class="recommendation">
+                <h3>✅ Recommendation</h3>
+                <p>
+                    Based on the results, <strong>Prompt Engineering</strong> 
+                    achieves the best performance with 
+                    71.0% accuracy 
+                    (-4.6% improvement).
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Generated by LLM Diagnostic Framework | 2025-12-28 23:43:55</p>
+        </div>
+    </div>
+</body>
+</html>
+        

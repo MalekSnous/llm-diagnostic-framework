@@ -1,0 +1,296 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Diagnostic Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric {
+            display: inline-block;
+            margin: 10px 20px 10px 0;
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 5px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .recommendation {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #27ae60;
+        }
+        .warning {
+            color: #f39c12;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 LLM Diagnostic Report</h1>
+    
+    <div class="section">
+        <h2>Summary</h2>
+        <div class="metric">
+            <div class="metric-label">Report Generated</div>
+            <div class="metric-value">2025-12-29 13:04:03</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Model Tested</div>
+            <div class="metric-value">microsoft/phi2</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Total Tests</div>
+            <div class="metric-value">5</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Overall Success Rate</div>
+            <div class="metric-value error">42.4%</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Total Cost</div>
+            <div class="metric-value">$0.0000</div>
+        </div>
+    </div>
+    
+    
+        <div class="section">
+            <h2>🧪 Structure Validation</h2>
+            <p><em>Tests ability to generate valid structured outputs</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value error">12.5%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">8</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$0.0000</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">65464ms</div>
+            </div>
+            
+            <div class="recommendation"><strong>⚠️ Issues Detected:</strong><ul><li>JSON generation is unreliable. Add explicit formatting instructions, provide examples, or use output validation + retry logic.</li><li>Code generation has syntax errors. Use specialized code models (e.g., CodeLlama) or add unit test validation.</li><li>Format constraints are not reliably followed. Use regex validation + regeneration, or post-process outputs programmatically.</li></ul></div>
+            
+            <p><strong>Explanation:</strong> LLMs generate tokens sequentially without built-in structure validation. They learn formatting patterns from training data but cannot guarantee syntactic correctness. Structured output APIs (when available) solve this by constraining the generation space.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Reasoning Depth Limits</h2>
+            <p><em>Tests multi-hop reasoning and logical depth limits</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value success">84.6%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">13</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$0.0000</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">67208ms</div>
+            </div>
+            
+            <div class="recommendation"><strong>⚠️ Issues Detected:</strong><ul><li>Model struggles with reasoning beyond 2 steps. Consider breaking complex tasks into simpler sub-tasks or using chain-of-thought prompting.</li><li>Arithmetic reasoning is weak. Consider using external calculators or specialized math tools via function calling.</li><li>Logical deduction is unreliable. For critical logic tasks, consider using symbolic reasoning systems or formal verification.</li></ul></div>
+            
+            <p><strong>Explanation:</strong> Transformers process sequences token by token without explicit symbolic reasoning mechanisms. Multi-hop reasoning requires maintaining and manipulating abstract representations, which becomes unreliable beyond a certain depth.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Hallucination Patterns</h2>
+            <p><em>Tests tendency to fabricate information and misuse context</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value error">25.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">8</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$0.0000</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">72230ms</div>
+            </div>
+            
+            <div class="recommendation"><strong>⚠️ Issues Detected:</strong><ul><li>High hallucination risk (56.2%). Add explicit instructions: 'If you don't know, say "I don't know" rather than guessing.'</li><li>Model fabricates information about non-existent entities. For factual tasks, use retrieval-augmented generation (RAG) with verified sources.</li><li>Model is susceptible to context pollution. Add explicit instructions to ignore irrelevant information and cite sources.</li></ul></div>
+            
+            <p><strong>Explanation:</strong> LLMs are trained to maximize fluency and coherence, not factual accuracy. When uncertain, they generate plausible-sounding information rather than expressing uncertainty. This is the hallucination problem.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Context Window Limits</h2>
+            <p><em>Tests attention degradation in long contexts</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value error">20.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">15</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$0.0000</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">81913ms</div>
+            </div>
+            
+            <div class="recommendation"><strong>⚠️ Issues Detected:</strong><ul><li>Context window becomes unreliable beyond 1000 tokens. Consider using RAG with chunking for longer documents.</li><li>Even early context information is being lost. This model may not be suitable for this task without architectural changes.</li></ul></div>
+            
+            <p><strong>Explanation:</strong> Transformer attention weights decay with distance. As context grows, the model allocates less attention to tokens far from the current position, leading to information loss.</p>
+        </div>
+        
+
+        <div class="section">
+            <h2>🧪 Knowledge Boundaries</h2>
+            <p><em>Tests knowledge cutoff, rare facts, and domain expertise</em></p>
+            
+            <div class="metric">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value warning">70.0%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Test Cases</div>
+                <div class="metric-value">10</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Cost</div>
+                <div class="metric-value">$0.0000</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Avg Latency</div>
+                <div class="metric-value">59381ms</div>
+            </div>
+            
+            <div class="recommendation"><strong>⚠️ Issues Detected:</strong><ul><li>Model knowledge is limited by training cutoff (2024-01). For recent events, use RAG with up-to-date sources or web search.</li><li>Specialized domain knowledge is unreliable. Use domain-specific models or retrieval from expert sources.</li><li>High hallucination risk (40.0%): Model fabricates answers for unknown facts instead of expressing uncertainty. Add explicit instructions to say 'I don't know' when uncertain.</li></ul></div>
+            
+            <p><strong>Explanation:</strong> LLM knowledge is constrained by: (1) training data cutoff, (2) frequency bias (rare facts underrepresented), and (3) domain coverage (specialized knowledge often missing).</p>
+        </div>
+        
+    
+    
+    
+    <div class="section">
+        <h2>📊 Visualizations</h2>
+        <div id="success-rate-chart"></div>
+        <div id="cost-comparison-chart"></div>
+    </div>
+    
+    <div class="section">
+        <h2>💡 Key Recommendations</h2>
+        <div class="recommendation"><strong>1.</strong> JSON generation is unreliable. Add explicit formatting instructions, provide examples, or use output validation + retry logic.</div><div class="recommendation"><strong>2.</strong> Code generation has syntax errors. Use specialized code models (e.g., CodeLlama) or add unit test validation.</div><div class="recommendation"><strong>3.</strong> Format constraints are not reliably followed. Use regex validation + regeneration, or post-process outputs programmatically.</div><div class="recommendation"><strong>4.</strong> Model struggles with reasoning beyond 2 steps. Consider breaking complex tasks into simpler sub-tasks or using chain-of-thought prompting.</div><div class="recommendation"><strong>5.</strong> Arithmetic reasoning is weak. Consider using external calculators or specialized math tools via function calling.</div>
+    </div>
+    
+    <script>
+        
+    // Success Rate Chart
+    var successData = [{
+        x: ["Structure Validation", "Reasoning Depth Limits", "Hallucination Patterns", "Context Window Limits", "Knowledge Boundaries"],
+        y: [12.5, 84.61538461538461, 25.0, 20.0, 70.0],
+        type: 'bar',
+        marker: {
+            color: ["#e74c3c", "#27ae60", "#e74c3c", "#e74c3c", "#f39c12"]
+        }
+    }];
+    
+    var successLayout = {
+        title: 'Success Rate by Test',
+        yaxis: {title: 'Success Rate (%)'}
+    };
+    
+    Plotly.newPlot('success-rate-chart', successData, successLayout);
+    
+    // Cost Comparison Chart
+    var costData = [{
+        x: ["Structure Validation", "Reasoning Depth Limits", "Hallucination Patterns", "Context Window Limits", "Knowledge Boundaries"],
+        y: [0, 0, 0, 0, 0],
+        type: 'bar',
+        marker: {color: '#3498db'}
+    }];
+    
+    var costLayout = {
+        title: 'Cost by Test',
+        yaxis: {title: 'Cost (USD)'}
+    };
+    
+    Plotly.newPlot('cost-comparison-chart', costData, costLayout);
+    
+    </script>
+</body>
+</html>
