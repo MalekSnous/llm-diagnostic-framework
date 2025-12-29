@@ -1,0 +1,138 @@
+llm-diagnostic-framework/
+├── README.md                          # Main documentation
+├── LICENSE                            # MIT License
+├── .gitignore                         # Python gitignore
+├── pyproject.toml                     # Modern Python packaging
+├── requirements.txt                   # Dependencies
+├── setup.py                           # Package installation
+├── Makefile                           # Common commands
+├── .env.example                       # Environment variables template
+│
+├── docs/                              # Documentation
+│   ├── theoretical_foundations.md     # Why LLMs fail
+│   ├── diagnostic_methodology.md      # How to diagnose
+│   ├── improvement_strategies.md      # Solutions catalog
+│   ├── api_reference.md               # API documentation
+│   └── deployment_guide.md            # Deployment instructions
+│
+├── llm_diagnostic/                    # Main package
+│   ├── __init__.py
+│   │
+│   ├── core/                          # Core diagnostic engine
+│   │   ├── __init__.py
+│   │   ├── llm_client.py              # Unified LLM interface
+│   │   ├── evaluator.py               # Evaluation metrics
+│   │   ├── diagnostic_engine.py       # Main diagnostic logic
+│   │   └── utils.py                   # Shared utilities
+│   │
+│   ├── failure_tests/                 # Failure taxonomy tests
+│   │   ├── __init__.py
+│   │   ├── base_test.py               # Abstract test class
+│   │   ├── context_limits.py          # Context window tests
+│   │   ├── reasoning_depth.py         # Multi-hop reasoning tests
+│   │   ├── knowledge_boundaries.py    # Knowledge cutoff tests
+│   │   ├── structure_validation.py    # Structured output tests
+│   │   └── hallucination_patterns.py  # Hallucination tests
+│   │
+│   ├── improvements/                  # Improvement strategies
+│   │   ├── __init__.py
+│   │   ├── base_strategy.py           # Abstract strategy class
+│   │   ├── prompt_engineering.py      # Advanced prompting
+│   │   ├── fine_tuning.py             # LoRA/PEFT fine-tuning
+│   │   ├── rag_system.py              # RAG implementation
+│   │   └── hybrid_architecture.py     # Combined approach
+│   │
+│   ├── visualization/                 # Visualization tools
+│   │   ├── __init__.py
+│   │   ├── attention_viz.py           # Attention heatmaps
+│   │   ├── performance_plots.py       # Metrics visualization
+│   │   └── report_generator.py        # HTML/PDF reports
+│   │
+│   └── models/                        # Data models
+│       ├── __init__.py
+│       ├── test_case.py               # Test case schema
+│       ├── diagnostic_result.py       # Result schema
+│       └── improvement_result.py      # Improvement schema
+│
+├── case_studies/                      # Real-world examples
+│   ├── medical_entity_extraction/
+│   │   ├── README.md
+│   │   ├── data/                      # Sample data
+│   │   ├── notebooks/                 # Analysis notebooks
+│   │   │   ├── 01_baseline.ipynb
+│   │   │   ├── 02_diagnosis.ipynb
+│   │   │   └── 03_improvements.ipynb
+│   │   ├── results/                   # Saved results
+│   │   └── run_study.py               # Automated pipeline
+│   │
+│   ├── code_generation/
+│   │   └── [similar structure]
+│   │
+│   └── document_qa/
+│       └── [similar structure]
+│
+├── data/                              # Datasets
+│   ├── test_datasets/                 # Standard test suites
+│   │   ├── context_tests.jsonl
+│   │   ├── reasoning_tests.jsonl
+│   │   ├── knowledge_tests.jsonl
+│   │   └── structure_tests.jsonl
+│   └── sample_data/                   # Example data
+│
+├── scripts/                           # Utility scripts
+│   ├── run_diagnostics.py             # Main diagnostic CLI
+│   ├── run_improvements.py            # Run improvement strategies
+│   ├── generate_report.py             # Generate HTML report
+│   ├── setup_environment.sh           # Environment setup
+│   └── download_models.sh             # Download model weights
+│
+├── tests/                             # Unit tests
+│   ├── __init__.py
+│   ├── test_llm_client.py
+│   ├── test_evaluator.py
+│   ├── test_failure_tests.py
+│   └── test_improvements.py
+│
+├── notebooks/                         # Exploratory notebooks
+│   ├── 01_quick_start.ipynb           # Getting started
+│   ├── 02_failure_analysis.ipynb      # Failure taxonomy demo
+│   ├── 03_diagnostic_demo.ipynb       # Full diagnostic pipeline
+│   └── 04_improvement_comparison.ipynb # Strategy comparison
+│
+├── web/                               # Web deployment (Phase 2)
+│   ├── backend/                       # FastAPI backend
+│   │   ├── main.py
+│   │   ├── api/
+│   │   │   ├── diagnostics.py
+│   │   │   └── improvements.py
+│   │   └── requirements.txt
+│   │
+│   └── frontend/                      # Streamlit frontend
+│       ├── app.py
+│       ├── components/
+│       └── requirements.txt
+│
+├── deployment/                        # Deployment configs
+│   ├── docker/
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml
+│   │   └── .dockerignore
+│   │
+│   ├── kubernetes/                    # K8s manifests
+│   │   ├── deployment.yaml
+│   │   ├── service.yaml
+│   │   └── ingress.yaml
+│   │
+│   └── modal/                         # Modal.com deployment
+│       └── modal_app.py
+│
+├── .github/                           # GitHub Actions
+│   └── workflows/
+│       ├── tests.yml                  # Run tests on PR
+│       ├── docs.yml                   # Build docs
+│       └── docker.yml                 # Build Docker image
+│
+└── results/                           # Experiment results
+    ├── diagnostics/                   # Diagnostic reports
+    ├── improvements/                  # Improvement results
+    └── comparisons/                   # Comparative analyses

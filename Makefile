@@ -1,0 +1,128 @@
+.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal
+
+help:
+	@echo "LLM Diagnostic Framework - Available Commands"
+	@echo "=============================================="
+	@echo "Setup:"
+	@echo "  make install         - Install package and dependencies"
+	@echo "  make install-dev     - Install with dev dependencies"
+	@echo "  make setup-env       - Create .env file from template"
+	@echo ""
+	@echo "Development:"
+	@echo "  make test            - Run tests"
+	@echo "  make test-cov        - Run tests with coverage"
+	@echo "  make lint            - Run linters"
+	@echo "  make format          - Format code with black and isort"
+	@echo "  make clean           - Remove build artifacts"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make diagnose        - Run diagnostic on a task"
+	@echo "  make improve         - Run improvement strategy"
+	@echo "  make report          - Generate HTML report"
+	@echo ""
+	@echo "Deployment:"
+	@echo "  make docker-build    - Build Docker image"
+	@echo "  make docker-run      - Run Docker container locally"
+	@echo "  make deploy-modal    - Deploy to Modal"
+	@echo "  make deploy-web      - Deploy web app"
+
+install:
+	pip install -e .
+
+install-dev:
+	pip install -e ".[dev,web]"
+
+install-all:
+	pip install -e ".[all]"
+
+setup-env:
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "Created .env file. Please add your API keys."; \
+	else \
+		echo ".env file already exists."; \
+	fi
+
+test:
+	pytest tests/ -v
+
+test-cov:
+	pytest tests/ -v --cov=llm_diagnostic --cov-report=html --cov-report=term
+	@echo "Coverage report generated in htmlcov/index.html"
+
+lint:
+	flake8 llm_diagnostic/ tests/
+	mypy llm_diagnostic/
+
+format:
+	black llm_diagnostic/ tests/ scripts/
+	isort llm_diagnostic/ tests/ scripts/
+
+clean:
+	rm -rf build/
+	rm -rf dist/
+	rm -rf *.egg-info
+	rm -rf .pytest_cache/
+	rm -rf .mypy_cache/
+	rm -rf htmlcov/
+	rm -rf .coverage
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+
+# Diagnostic commands
+diagnose:
+	@echo "Running diagnostic..."
+	python scripts/run_diagnostics.py --task "$(task)" --model "$(model)"
+
+improve:
+	@echo "Running improvement strategy: $(strategy)"
+	python scripts/run_improvements.py --strategy "$(strategy)" --case-study "$(case)"
+
+report:
+	@echo "Generating report..."
+	python scripts/generate_report.py --case-study "$(case)"
+
+# Docker
+docker-build:
+	docker build -t llm-diagnostic:latest -f deployment/docker/Dockerfile .
+
+docker-run:
+	docker-compose -f deployment/docker/docker-compose.yml up
+
+docker-stop:
+	docker-compose -f deployment/docker/docker-compose.yml down
+
+# Web app
+web-backend:
+	cd web/backend && uvicorn main:app --reload --port 8000
+
+web-frontend:
+	cd web/frontend && streamlit run app.py
+
+# Deployment
+deploy-modal:
+	modal deploy deployment/modal/modal_app.py
+
+deploy-web:
+	@echo "Building and deploying web app..."
+	$(MAKE) docker-build
+	@echo "Push to your container registry and deploy"
+
+# Notebooks
+notebook:
+	jupyter notebook notebooks/
+
+# Download models (for fine-tuning)
+download-models:
+	bash scripts/download_models.sh
+
+# Run case study
+run-medical-study:
+	python case_studies/medical_entity_extraction/run_study.py
+
+run-code-study:
+	python case_studies/code_generation/run_study.py
+
+# GitHub Actions locally (requires act)
+test-ci:
+	act -j test

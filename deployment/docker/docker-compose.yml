@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  llm-diagnostic:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+    container_name: llm-diagnostic
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - RESULTS_DIR=/app/results
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    command: bash -c "echo 'LLM Diagnostic Framework Ready' && sleep infinity"
+    restart: unless-stopped
+
+  # Optional: Web app frontend
+  web-frontend:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile
+    container_name: llm-diagnostic-web
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./results:/app/results
+    ports:
+      - "8501:8501"
+    command: streamlit run web/frontend/app.py --server.port 8501
+    restart: unless-stopped
+    depends_on:
+      - llm-diagnostic
+
+volumes:
+  results:
+  data:

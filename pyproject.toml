@@ -1,0 +1,118 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-diagnostic"
+version = "0.1.0"
+description = "A systematic framework for diagnosing and improving LLM performance"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Malek Senoussi", email = "malek.senoussi@gmail.com"}
+]
+keywords = ["llm", "diagnostics", "machine-learning", "nlp", "evaluation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "openai>=1.3.0",
+    "anthropic>=0.8.0",
+    "torch>=2.0.0",
+    "transformers>=4.35.0",
+    "peft>=0.7.0",
+    "datasets>=2.14.0",
+    "sentence-transformers>=2.2.0",
+    "langchain>=0.1.0",
+    "langchain-community>=0.0.10",
+    "faiss-cpu>=1.7.4",
+    "chromadb>=0.4.18",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "plotly>=5.17.0",
+    "tqdm>=4.65.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.6.0",
+    "typer>=0.9.0",
+    "httpx>=0.25.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.5.0",
+    "ipython>=8.14.0",
+    "jupyter>=1.0.0",
+    "notebook>=7.0.0",
+]
+
+web = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "streamlit>=1.28.0",
+]
+
+deployment = [
+    "modal>=0.55.0",
+    "docker>=6.1.0",
+]
+
+all = [
+    "llm-diagnostic[dev,web,deployment]"
+]
+
+[project.urls]
+Homepage = "https://github.com/MalekSnous/llm-diagnostic-framework"
+Documentation = "https://github.com/MalekSnous/llm-diagnostic-framework/blob/main/README.md"
+Repository = "https://github.com/MalekSnous/llm-diagnostic-framework"
+Issues = "https://github.com/MalekSnous/llm-diagnostic-framework/issues"
+
+[project.scripts]
+llm-diagnose = "llm_diagnostic.cli:diagnose"
+llm-improve = "llm_diagnostic.cli:improve"
+llm-report = "llm_diagnostic.cli:report"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["llm_diagnostic*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=llm_diagnostic --cov-report=html --cov-report=term"
