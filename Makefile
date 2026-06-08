@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal
+.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal run-medical-study run-rag-study publish publish-only
 
 help:
 	@echo "LLM Diagnostic Framework - Available Commands"
@@ -19,6 +19,12 @@ help:
 	@echo "  make diagnose        - Run diagnostic on a task"
 	@echo "  make improve         - Run improvement strategy"
 	@echo "  make report          - Generate HTML report"
+	@echo ""
+	@echo "Case studies & publishing:"
+	@echo "  make run-medical-study model=gpt-4o-mini"
+	@echo "  make run-rag-study model=gpt-4o-mini"
+	@echo "  make publish model=gpt-4o-mini  - Run studies + publish reports to docs/"
+	@echo "  make publish-only               - Publish existing reports (no re-run)"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make docker-build    - Build Docker image"
@@ -119,12 +125,30 @@ notebook:
 download-models:
 	bash scripts/download_models.sh
 
-# Run case study
+# Run case study (override the model with: make run-medical-study model=gpt-4o)
+MODEL ?= gpt-4o-mini
+
 run-medical-study:
-	python case_studies/medical_entity_extraction/run_study.py
+	python case_studies/medical_entity_extraction/run_study.py --model $(or $(model),$(MODEL))
 
 run-rag-study:
-	python case_studies/rag_document_qa/run_study.py --model $(or $(model),gpt-4o-mini)
+	python case_studies/rag_document_qa/run_study.py --model $(or $(model),$(MODEL))
+
+# One command: run both studies for a model, then copy the freshest HTML reports
+# into docs/ and regenerate the landing-page cards. Study failures (e.g. missing
+# API key or RAG extra) are non-fatal so whatever ran still gets published.
+# Usage:  make publish model=gpt-4o-mini
+publish:
+	-python case_studies/medical_entity_extraction/run_study.py --model $(or $(model),$(MODEL))
+	-python case_studies/rag_document_qa/run_study.py --model $(or $(model),$(MODEL))
+	python scripts/publish_reports.py
+	@echo ""
+	@echo "Reports published to docs/. Review, then commit & push to deploy Pages:"
+	@echo "    git add docs/ && git commit -m 'Update published reports' && git push"
+
+# Only (re)publish reports that already exist in results/, without re-running.
+publish-only:
+	python scripts/publish_reports.py
 
 # GitHub Actions locally (requires act)
 test-ci:
