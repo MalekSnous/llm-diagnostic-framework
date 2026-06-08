@@ -71,13 +71,17 @@ class OpenAIClient(BaseLLMClient):
 
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-        # Pricing per 1K tokens (approximate, update as needed)
+        # Pricing in USD per 1K tokens (must match the per-1K math in
+        # _calculate_cost). Values below are the published per-1M-token prices
+        # divided by 1000 — e.g. gpt-4o is $2.50/$10.00 per 1M => 0.0025/0.01.
+        # A previous version stored gpt-4o/gpt-4o-mini/gpt-4-turbo as per-1M
+        # prices here, which inflated all reported costs by ~1000x.
         self.pricing = {
             "gpt-4-turbo-preview": {"input": 0.01, "output": 0.03},
-            "gpt-4o": {"input": 2.50, "output": 10.00},
+            "gpt-4o": {"input": 0.0025, "output": 0.01},
             "gpt-4": {"input": 0.03, "output": 0.06},
-            "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-            "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+            "gpt-4-turbo": {"input": 0.01, "output": 0.03},
             "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
         }
 

@@ -1,5 +1,12 @@
 # 🚀 LLM Diagnostic Framework - Portfolio Showcase
 
+> ⚠️ **Numbers below are illustrative and being re-generated.** Early figures came
+> from a recall-only entity metric (verbosity artifact) and a ~1000× token-pricing
+> bug — both now fixed and unit-tested. See the
+> [reproducibility note](RESULTS_ANALYSIS.md#reproducibility-note-read-first).
+> The methodology and engineering story are the point; reproduce the studies for
+> trustworthy figures.
+
 ## Project Overview
 
 A **systematic, data-driven framework** for evaluating LLM performance and optimization strategies. Combines automated testing, cost-benefit analysis, and professional reporting to make evidence-based decisions about LLM deployments.

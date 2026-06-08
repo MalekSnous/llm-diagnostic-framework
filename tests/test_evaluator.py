@@ -44,6 +44,37 @@ def test_evaluation_metrics_add_details():
     assert m.to_dict()["details"]["notes"] == {"k": "v"}
 
 
+def test_parse_entity_list_drops_prose():
+    out = Evaluator.parse_entity_list("diabetes, hypertension and metformin")
+    assert "diabetes" in out and "hypertension" in out and "metformin" in out
+    # A long prose sentence should not be kept as an entity.
+    prose = Evaluator.parse_entity_list("The patient was a brilliant mind pushing many boundaries")
+    assert prose == []
+
+
+def test_fuzzy_entity_metrics_containment():
+    m = Evaluator.fuzzy_entity_metrics(["type 2 diabetes", "metformin"], ["diabetes", "metformin"])
+    assert m.metrics["recall"] == 1.0
+    assert m.metrics["precision"] == 1.0
+    assert m.metrics["f1"] == 1.0
+
+
+def test_fuzzy_entity_metrics_penalises_verbosity():
+    """A verbose dump that happens to contain the answers must NOT score 100%.
+
+    This is the Phi-2 artifact: recall-only substring matching gave 100%, but
+    precision collapses once spurious candidates are counted.
+    """
+    reference = ["diabetes", "metformin"]
+    verbose = Evaluator.parse_entity_list(
+        "diabetes, metformin, aspirin, surgery, cancer, fever, headache, insulin, asthma"
+    )
+    m = Evaluator.fuzzy_entity_metrics(verbose, reference)
+    assert m.metrics["recall"] == 1.0  # both answers present
+    assert m.metrics["precision"] < 0.5  # but lots of junk
+    assert m.metrics["f1"] < 0.7  # so F1 is not inflated
+
+
 def test_cost_analysis():
     responses = [
         LLMResponse("a", "m", tokens_used=10, latency_ms=5.0, cost_usd=0.01),

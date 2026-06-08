@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from rich.console import Console
 from rich.table import Table
 
-from llm_diagnostic.core.evaluator import EvaluationMetrics
+from llm_diagnostic.core.evaluator import EvaluationMetrics, Evaluator
 from llm_diagnostic.core.llm_client import get_llm_client
 from llm_diagnostic.failure_tests.base_test import TestCase, TestResult
 from llm_diagnostic.improvements.base_strategy import ImprovementResult
@@ -90,6 +90,26 @@ MEDICAL_KB = [
 ]
 
 
+def score(prediction_text, expected_entities):
+    """Score one prediction with precision/recall/F1 (containment matching).
+
+    Headline metric is F1, which — unlike the old recall-only substring scan —
+    penalises verbose models that dump extra entities. See
+    Evaluator.fuzzy_entity_metrics / parse_entity_list.
+    """
+    predicted = Evaluator.parse_entity_list(prediction_text)
+    m = Evaluator.fuzzy_entity_metrics(predicted, expected_entities)
+    return {
+        "f1": m.metrics["f1"],
+        "precision": m.metrics["precision"],
+        "recall": m.metrics["recall"],
+    }
+
+
+def _mean(results, key):
+    return sum(r.metrics[key] for r in results) / len(results) if results else 0.0
+
+
 def create_test_cases():
     """Create test cases for medical entity extraction."""
     test_cases = []
@@ -116,43 +136,31 @@ def run_baseline(test_cases, llm_client):
 
     for test_case in test_cases:
         response = llm_client.generate(test_case.input, max_tokens=200)
-
-        # Simple evaluation: check if expected entities are in response
-        prediction = response.text
-
-        # Count how many expected entities were found
-        entities_found = sum(
-            1
-            for entity in EXPECTED_ENTITIES[int(test_case.id.split("_")[1])]
-            if entity.lower() in prediction.lower()
-        )
-        total_entities = len(EXPECTED_ENTITIES[int(test_case.id.split("_")[1])])
-
-        accuracy = entities_found / total_entities if total_entities > 0 else 0
+        expected = EXPECTED_ENTITIES[int(test_case.id.split("_")[1])]
+        s = score(response.text, expected)
 
         baseline_results.append(
             TestResult(
                 test_case_id=test_case.id,
-                prediction=prediction,
+                prediction=response.text,
                 reference=test_case.expected_output,
-                success=accuracy > 0.5,
-                metrics={
-                    "accuracy": accuracy,
-                    "entities_found": entities_found,
-                    "total_entities": total_entities,
-                },
+                success=s["f1"] > 0.5,
+                metrics=s,
                 response=response,
             )
         )
 
-    # Calculate aggregate
-    avg_accuracy = sum(r.metrics["accuracy"] for r in baseline_results) / len(baseline_results)
+    avg_f1 = _mean(baseline_results, "f1")
     total_cost = sum(r.response.cost_usd for r in baseline_results if r.response.cost_usd)
 
-    console.print(f"[yellow]Baseline Accuracy: {avg_accuracy:.1%}[/yellow]")
+    console.print(
+        f"[yellow]Baseline F1: {avg_f1:.1%} "
+        f"(P={_mean(baseline_results, 'precision'):.1%} R={_mean(baseline_results, 'recall'):.1%})"
+        f"[/yellow]"
+    )
     console.print(f"[yellow]Baseline Cost: ${total_cost:.4f}[/yellow]")
 
-    return baseline_results, avg_accuracy, total_cost
+    return baseline_results, avg_f1, total_cost
 
 
 def run_prompt_engineering(test_cases, baseline_results, llm_client):
@@ -169,17 +177,13 @@ def run_prompt_engineering(test_cases, baseline_results, llm_client):
         llm_client=llm_client,
     )
 
-    # Recompute accuracy from the entity-overlap metric used for the baseline
-    total_accuracy = 0
-    for i, result in enumerate(improved_results):
-        prediction = result.prediction.lower()
-        expected_entities = EXPECTED_ENTITIES[i]
-        entities_found = sum(1 for entity in expected_entities if entity.lower() in prediction)
-        accuracy = entities_found / len(expected_entities) if expected_entities else 0
-        total_accuracy += accuracy
+    # Re-score with the same F1 metric used for the baseline.
+    for result in improved_results:
+        expected_entities = EXPECTED_ENTITIES[int(result.test_case_id.split("_")[1])]
+        result.metrics = score(result.prediction, expected_entities)
 
-    improved_accuracy = total_accuracy / len(improved_results) if improved_results else 0
-    baseline_accuracy = sum(r.metrics["accuracy"] for r in baseline_results) / len(baseline_results)
+    improved_accuracy = _mean(improved_results, "f1")
+    baseline_accuracy = _mean(baseline_results, "f1")
     improvement = (improved_accuracy - baseline_accuracy) * 100
 
     total_cost = sum(
@@ -187,7 +191,9 @@ def run_prompt_engineering(test_cases, baseline_results, llm_client):
     )
 
     console.print(
-        f"[green]Improved Accuracy: {improved_accuracy:.1%} ({improvement:+.1f}%)[/green]"
+        f"[green]Improved F1: {improved_accuracy:.1%} ({improvement:+.1f}%) "
+        f"(P={_mean(improved_results, 'precision'):.1%} R={_mean(improved_results, 'recall'):.1%})"
+        f"[/green]"
     )
     console.print(f"[green]Cost: ${total_cost:.4f}[/green]")
 
@@ -225,17 +231,13 @@ def run_rag_system(test_cases, baseline_results, llm_client):
         knowledge_base=MEDICAL_KB,
     )
 
-    # Recompute accuracy from the entity-overlap metric used for the baseline
-    total_accuracy = 0
-    for i, result in enumerate(improved_results):
-        prediction = result.prediction.lower()
-        expected_entities = EXPECTED_ENTITIES[i]
-        entities_found = sum(1 for entity in expected_entities if entity.lower() in prediction)
-        accuracy = entities_found / len(expected_entities) if expected_entities else 0
-        total_accuracy += accuracy
+    # Re-score with the same F1 metric used for the baseline.
+    for result in improved_results:
+        expected_entities = EXPECTED_ENTITIES[int(result.test_case_id.split("_")[1])]
+        result.metrics = score(result.prediction, expected_entities)
 
-    improved_accuracy = total_accuracy / len(improved_results) if improved_results else 0
-    baseline_accuracy = sum(r.metrics["accuracy"] for r in baseline_results) / len(baseline_results)
+    improved_accuracy = _mean(improved_results, "f1")
+    baseline_accuracy = _mean(baseline_results, "f1")
     improvement = (improved_accuracy - baseline_accuracy) * 100
 
     total_cost = sum(
@@ -243,7 +245,9 @@ def run_rag_system(test_cases, baseline_results, llm_client):
     )
 
     console.print(
-        f"[green]Improved Accuracy: {improved_accuracy:.1%} ({improvement:+.1f}%)[/green]"
+        f"[green]Improved F1: {improved_accuracy:.1%} ({improvement:+.1f}%) "
+        f"(P={_mean(improved_results, 'precision'):.1%} R={_mean(improved_results, 'recall'):.1%})"
+        f"[/green]"
     )
     console.print(f"[green]Cost: ${total_cost:.4f}[/green]")
 
@@ -272,9 +276,9 @@ def generate_summary(baseline_acc, baseline_cost, prompt_result, rag_result):
     console.print("[bold cyan]     CASE STUDY: FINAL SUMMARY       [/bold cyan]")
     console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]\n")
 
-    table = Table(show_header=True, title="Medical Entity Extraction Results")
+    table = Table(show_header=True, title="Medical Entity Extraction Results (F1)")
     table.add_column("Strategy", style="cyan")
-    table.add_column("Accuracy", style="green")
+    table.add_column("F1", style="green")
     table.add_column("Improvement", style="magenta")
     table.add_column("Cost", style="yellow")
     table.add_column("Cost/Point", style="red")
@@ -329,24 +333,25 @@ def main():
     console.print("[bold cyan]║   Medical Entity Extraction Case Study   ║[/bold cyan]")
     console.print("[bold cyan]╚════════════════════════════════════════════╝[/bold cyan]")
 
+    import argparse
     import os
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        console.print(f"[green]✓ API Key configured: {api_key[:20]}...[/green]")
-    else:
-        console.print("[red]✗ No API Key found![/red]")
-        return
+    parser = argparse.ArgumentParser(description="Medical entity extraction case study")
+    parser.add_argument("--model", default="gpt-4o-mini", help="Model to benchmark")
+    args = parser.parse_args()
+    model_name = args.model
+
+    # Hosted models need an API key; local HF models (e.g. microsoft/phi-2) don't.
+    if model_name.startswith(("gpt-", "claude-")):
+        key_var = "OPENAI_API_KEY" if model_name.startswith("gpt-") else "ANTHROPIC_API_KEY"
+        if not os.getenv(key_var):
+            console.print(f"[red]✗ {key_var} not set (required for {model_name}).[/red]")
+            return
 
     # Initialize
     console.print("\n[bold]Initializing...[/bold]")
     test_cases = create_test_cases()
     console.print(f"[green]Created {len(test_cases)} test cases[/green]")
-
-    # MODIFIER ICI : Changer le nom du modèle
-    # model_name = "microsoft/phi-2"
-    model_name = "gpt-4o-mini"
-    # model_name = 'gpt-4o'
 
     llm_client = get_llm_client(model_name)
     console.print(f"[green]Initialized LLM client: {model_name}[/green]")

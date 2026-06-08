@@ -4,6 +4,7 @@ Provides both standard metrics (accuracy, F1) and LLM-specific metrics (hallucin
 """
 
 import json
+import re
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -121,6 +122,65 @@ class Evaluator:
         metrics.add_metric("false_positives", false_positives)
         metrics.add_metric("false_negatives", false_negatives)
 
+        return metrics
+
+    @staticmethod
+    def parse_entity_list(text: str) -> List[str]:
+        """Parse a free-text model answer into candidate entities.
+
+        Splits on common separators (commas, semicolons, newlines, bullets,
+        " and ") and drops prose-like fragments (more than 6 words). This is
+        what lets us measure *precision*: a verbose model that dumps prose
+        produces many spurious candidates rather than a clean entity list.
+        """
+        # Strip code fences and common lead-in labels.
+        cleaned = re.sub(r"```[a-zA-Z]*", " ", text)
+        cleaned = re.sub(r"(?i)\b(extract|entities|answer|output)\s*:", " ", cleaned)
+        parts = re.split(r"[,\n;]|\s•\s|\s-\s|\s•\s|\band\b", cleaned)
+        entities = []
+        seen = set()
+        for part in parts:
+            item = part.strip().strip(".:-*•\t ").lower()
+            if not item or len(item.split()) > 6:
+                continue
+            if item not in seen:
+                seen.add(item)
+                entities.append(item)
+        return entities
+
+    @staticmethod
+    def fuzzy_entity_metrics(predicted: List[str], reference: List[str]) -> EvaluationMetrics:
+        """Precision/recall/F1 for one example with containment matching.
+
+        A predicted entity matches a reference entity if either contains the
+        other (so "type 2 diabetes" matches "diabetes"). Each reference and
+        each prediction is matched at most once. Unlike a recall-only substring
+        scan over raw text, this penalises both misses (recall) and spurious
+        output (precision), so verbosity no longer inflates the score.
+        """
+        metrics = EvaluationMetrics()
+        pred = [p for p in predicted if p]
+        ref = [r.lower() for r in reference if r]
+
+        matched_ref = set()
+        matched_pred = set()
+        for ri, r in enumerate(ref):
+            for pi, p in enumerate(pred):
+                if pi in matched_pred:
+                    continue
+                if r in p or p in r:
+                    matched_ref.add(ri)
+                    matched_pred.add(pi)
+                    break
+
+        tp = len(matched_ref)
+        precision = len(matched_pred) / len(pred) if pred else 0.0
+        recall = tp / len(ref) if ref else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+        metrics.add_metric("precision", precision)
+        metrics.add_metric("recall", recall)
+        metrics.add_metric("f1", f1)
         return metrics
 
     @staticmethod

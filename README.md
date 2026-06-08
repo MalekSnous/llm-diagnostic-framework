@@ -17,21 +17,30 @@
 
 **The Solution**: This framework provides **empirical testing and cost-benefit analysis** to answer these questions systematically, not by guessing.
 
-### Key Insight from Real Testing
+### What it measures
 
-Our medical entity extraction case study revealed **counterintuitive results**:
+For a given task, the framework runs a **baseline** and each optimization
+strategy (prompt engineering, RAG, fine-tuning) under one harness, and reports
+**quality vs cost** so the trade-off is explicit:
 
-| Model | Baseline | +Prompt Eng | +RAG | Cost |
-|-------|----------|-------------|------|------|
-| **GPT-4o-mini** | 75.6% | **71.0% (-4.6%)** | **66.9% (-8.8%)** | $0.41 |
-| **GPT-4o** | 71.5% | **68.5% (-2.9%)** | **64.8% (-6.7%)** | $4.06 |
-| **Phi-2 (local)** | 71.7% | **100% (+28.3%)** | **90% (+18.3%)** | $0.00 |
+- **Quality** — task-appropriate metrics. For entity extraction it uses
+  **precision / recall / F1** (via `Evaluator.fuzzy_entity_metrics`), not a
+  recall-only substring scan — so a verbose model can't win just by dumping text.
+- **Cost** — real token cost per provider (OpenAI per-1K, Anthropic per-1M),
+  local models at $0.
 
-**Findings:**
-1. ✅ **Smaller models benefit more** from optimization (Phi-2: +28%)
-2. ❌ **Advanced models can degrade** with generic strategies (GPT-4o-mini: -8.8%)
-3. 💰 **GPT-4o costs 10x more** but performs worse than GPT-4o-mini
-4. 📊 **Empirical testing is essential** - theory doesn't predict real performance
+> **Reproducibility note.** Earlier headline numbers in this README came from a
+> draft scoring method (recall-only substring match) and a token-pricing bug
+> (per-1M vs per-1K, ~1000× cost inflation). Both are now fixed and covered by
+> tests, so old figures were removed rather than shown misleadingly. Re-run the
+> case studies (below) to generate trustworthy numbers for your own setup.
+
+**Qualitative lessons that hold up:**
+1. 📊 **Measure the baseline first** — optimization is not free lunch.
+2. ❌ **Generic strategies can *hurt*** a model that's already strong at the task.
+3. ✅ **RAG wins when the answer is outside the model's knowledge** (see the
+   document-QA study) and can hurt when it just adds noise (medical study).
+4. 💰 **Match model size to task** — and judge on cost *per quality point*, not raw accuracy.
 
 ---
 
@@ -99,55 +108,41 @@ python scripts/generate_report.py \
 
 ---
 
-## 📊 Real Results: Medical Entity Extraction Case Study
+## 📊 Case Studies
 
-### The Challenge
+Two studies designed to tell **opposite** stories — which is the whole point:
+optimization is task-dependent, so you must measure.
+
+### 1. Medical Entity Extraction — when optimization can *hurt*
 
 Extract medical entities (conditions, medications, procedures) from clinical text:
 - **Input**: "Patient with hypertension and diabetes. Prescribed metformin 500mg."
 - **Expected**: `["hypertension", "diabetes", "metformin"]`
+- **Metric**: precision / recall / **F1** with containment matching.
 
-### Models Tested
+Compares **baseline vs prompt engineering vs RAG** across hosted and local models.
+The expected pattern: on a model already strong at the task, generic strategies
+can add noise and *reduce* F1 — so the baseline must be beaten, not assumed.
 
-We compared **4 models** across **3 optimization strategies**:
+```bash
+python case_studies/medical_entity_extraction/run_study.py --model gpt-4o-mini
+python case_studies/medical_entity_extraction/run_study.py --model microsoft/phi-2   # local, [local] extra
+```
 
-#### 1. **GPT-4o-mini** (Recommended for Production)
+### 2. Document QA with RAG — when retrieval *wins*
 
-| Strategy | Accuracy | Change | Cost (8 cases) | Cost/Case |
-|----------|----------|--------|----------------|-----------|
-| **Baseline (Zero-shot)** | **75.6%** | - | **$0.41** | **$0.05** |
-| Prompt Engineering | 71.0% | **-4.6%** ❌ | $0.24 | $0.03 |
-| RAG System | 66.9% | **-8.8%** ❌ | $0.34 | $0.04 |
+Questions about a private document (`data/product_docs.txt`) the model was never
+trained on. Baseline (closed-book) must guess; RAG retrieves the answer.
 
-**Key Finding**: GPT-4o-mini's zero-shot performance was optimal. Generic optimization strategies **degraded** accuracy by confusing the model with unnecessary context.
+```bash
+pip install -e ".[rag]"
+python case_studies/rag_document_qa/run_study.py --model gpt-4o-mini
+```
 
-#### 2. **GPT-4o** (Premium, Not Worth It)
+Each study writes a JSON + interactive HTML report to `results/case_studies/`.
 
-| Strategy | Accuracy | Change | Cost (8 cases) | Cost/Case |
-|----------|----------|--------|----------------|-----------|
-| Baseline | 71.5% | - | **$4.06** | **$0.51** |
-| Prompt Engineering | 68.5% | -2.9% ❌ | $3.79 | $0.47 |
-| RAG System | 64.8% | -6.7% ❌ | $4.14 | $0.52 |
-
-**Key Finding**: GPT-4o cost **10x more** than GPT-4o-mini while performing **worse** (71.5% vs 75.6%). For simple entity extraction, bigger ≠ better.
-
-#### 3. **Phi-2** (Local, Best for Optimization)
-
-| Strategy | Accuracy | Change | Cost |
-|----------|----------|--------|------|
-| Baseline | 71.7% | - | $0.00 |
-| Prompt Engineering | **100%** | **+28.3%** ✅ | $0.00 |
-| RAG System | **90%** | **+18.3%** ✅ | $0.00 |
-
-**Key Finding**: Smaller models (2.7B params) benefit **dramatically** from optimization strategies (+28%). Perfect for local deployment with fine-tuning budget.
-
-### Cost-Benefit Analysis Summary
-
-| Model | Best Strategy | Final Accuracy | Total Cost | ROI |
-|-------|---------------|----------------|------------|-----|
-| **GPT-4o-mini** | Zero-shot | 75.6% | $0.41 | ✅ Best value |
-| GPT-4o | Zero-shot | 71.5% | $4.06 | ❌ Worst value |
-| **Phi-2** | Prompt Eng | 100% | $0.00 | ✅ Best accuracy |
+> Concrete numbers are intentionally **not** hard-coded here — run the studies with
+> your own models/keys to get figures you can trust. See the reproducibility note above.
 
 ---
 
@@ -279,41 +274,30 @@ llm-diagnostic-framework/
 
 ---
 
-## 🎓 Key Learnings
+## 🎓 Key Learnings (methodology, not marketing)
 
-### 1. **Model Size ≠ Performance**
+### 1. **Match model size to task**
+A bigger model isn't automatically better for a narrow task; judge on **cost per
+quality point**, not raw accuracy or raw price.
 
-GPT-4o-mini (8B params) **outperformed** GPT-4o (1.7T params) on entity extraction:
-- GPT-4o-mini: 75.6% @ $0.05/case
-- GPT-4o: 71.5% @ $0.51/case
+### 2. **Optimization can hurt**
+Generic few-shot examples or RAG context can *dilute* a model that's already
+strong at the task. **Baseline testing is mandatory** — not all strategies help.
 
-**Lesson**: Match model size to task complexity. Overkill wastes money.
+### 3. **RAG is conditional, not a default**
+RAG wins when the answer is **outside the model's knowledge** (the document-QA
+study) and can hurt when it just adds noise (the medical study).
 
-### 2. **Optimization Can Hurt**
+### 4. **Beware metric artifacts** *(a real bug this project caught)*
+A recall-only substring metric made a weak local model look like it scored 100%
+— it was simply being verbose, so every expected token appeared somewhere in its
+output. Switching to **precision/recall/F1** (`Evaluator.fuzzy_entity_metrics`)
+removed the illusion. **Always sanity-check a metric against raw model output.**
 
-Both GPT-4o-mini and GPT-4o **degraded** with generic few-shot examples:
-- Generic examples confused models that already had strong medical knowledge
-- RAG context diluted focus on entity extraction
-
-**Lesson**: Baseline testing is mandatory. Not all strategies help all tasks.
-
-### 3. **Smaller Models Need More Help**
-
-Phi-2 (2.7B params) gained **+28%** from prompt engineering:
-- Baseline: 71.7%
-- With optimization: 100%
-
-**Lesson**: Budget-constrained projects should use smaller models + optimization.
-
-### 4. **Cost-Effectiveness Varies Wildly**
-
-| Model | Accuracy | Cost/1K cases | Cost per Point |
-|-------|----------|---------------|----------------|
-| GPT-4o | 71.5% | $510 | $7.13 |
-| GPT-4o-mini | 75.6% | $50 | $0.66 |
-| Phi-2 (optimized) | 100% | $0 | $0.00 |
-
-**Lesson**: Always calculate cost per accuracy point, not just total cost.
+### 5. **Get the cost units right**
+Token pricing is quoted per-1M by providers but often computed per-1K in code — a
+1000× error waiting to happen. The pricing table and `_calculate_cost` are now
+consistent and unit-tested.
 
 ---
 

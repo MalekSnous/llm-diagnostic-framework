@@ -81,24 +81,16 @@
 
 <section id="insight">
   <div class="wrap">
-    <h2>The key insight: optimization can <em>hurt</em></h2>
-    <p class="lead">Real results from the medical entity-extraction case study — bigger isn't better, and generic "best practices" can degrade a strong model.</p>
-    <table>
-      <thead>
-        <tr><th>Model</th><th>Baseline</th><th>+ Prompt Eng.</th><th>+ RAG</th><th>Cost (8 cases)</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><strong>GPT-4o-mini</strong></td><td>75.6%</td><td class="neg">71.0% (&minus;4.6%)</td><td class="neg">66.9% (&minus;8.8%)</td><td>$0.41</td></tr>
-        <tr><td><strong>GPT-4o</strong></td><td>71.5%</td><td class="neg">68.5% (&minus;2.9%)</td><td class="neg">64.8% (&minus;6.7%)</td><td>$4.06</td></tr>
-        <tr><td><strong>Phi-2 (local)</strong></td><td>71.7%</td><td class="pos">100% (+28.3%)</td><td class="pos">90% (+18.3%)</td><td>$0.00</td></tr>
-      </tbody>
-    </table>
+    <h2>The thesis: optimization is task-dependent — so measure</h2>
+    <p class="lead">Prompt engineering, RAG and fine-tuning each help on some tasks and hurt on others. This framework benchmarks <strong>quality vs cost</strong> under one harness so the trade-off is explicit.</p>
     <ul class="takeaways">
-      <li>✅ <strong>Smaller models benefit most</strong> from optimization (Phi-2: +28%).</li>
-      <li>❌ <strong>Strong models can degrade</strong> with generic strategies (GPT-4o-mini: &minus;8.8%).</li>
-      <li>💰 <strong>GPT-4o cost 10&times; more</strong> yet performed worse than GPT-4o-mini.</li>
-      <li>📊 <strong>Baseline testing is mandatory</strong> — theory doesn't predict real performance.</li>
+      <li>📊 <strong>Measure the baseline first</strong> — optimization is not a free lunch.</li>
+      <li>❌ <strong>Generic strategies can hurt</strong> a model already strong at the task.</li>
+      <li>✅ <strong>RAG wins when the answer is outside the model's knowledge</strong> — and hurts when it just adds noise.</li>
+      <li>💰 <strong>Judge cost per quality point</strong>, not raw accuracy or raw price.</li>
+      <li>🔬 <strong>Trust the metric, not the vibe</strong> — entity extraction is scored with precision/recall/F1, so a verbose model can't win by dumping text.</li>
     </ul>
+    <p class="lead" style="margin-top:20px;font-size:.92rem;">Concrete numbers are intentionally produced by running the studies (below) — re-run them with your own models/keys to get figures you can trust.</p>
   </div>
 </section>
 
@@ -110,8 +102,8 @@
       <div class="card">
         <span class="tag">Entity extraction</span>
         <h3>Medical Entity Extraction</h3>
-        <p>When generic RAG and few-shot prompting <em>degrade</em> an already-strong model. Full cost/accuracy breakdown across 4 models.</p>
-        <a href="medical_entity_extraction_gpt-4o-mini_20251228_234355.html">Open interactive report &rarr;</a>
+        <p>When generic RAG and few-shot prompting <em>degrade</em> an already-strong model. Scored with precision/recall/F1.</p>
+        <a href="https://github.com/MalekSnous/llm-diagnostic-framework/tree/main/case_studies/medical_entity_extraction">See the study on GitHub &rarr;</a>
       </div>
       <div class="card">
         <span class="tag">RAG &middot; Document QA</span>
@@ -126,15 +118,10 @@
 <section id="reports">
   <div class="wrap">
     <h2>Interactive reports</h2>
-    <p class="lead">Auto-generated HTML reports produced by the framework.</p>
-    <div class="grid">
-      <div class="card"><h3>GPT-4o-mini &mdash; Case study</h3><p>Baseline vs prompt engineering vs RAG.</p><a href="medical_entity_extraction_gpt-4o-mini_20251228_234355.html">Open report &rarr;</a></div>
-      <div class="card"><h3>GPT-4o &mdash; Case study</h3><p>Premium model, worse value.</p><a href="medical_entity_extraction_gpt-4o_20251228_234537.html">Open report &rarr;</a></div>
-      <div class="card"><h3>Phi-2 &mdash; Case study</h3><p>Local model, biggest optimization gains.</p><a href="medical_entity_extraction_microsoft_phi-2_20251228_171544.html">Open report &rarr;</a></div>
-      <div class="card"><h3>GPT-4o-mini &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="gpt4o-mini-test_report.html">Open report &rarr;</a></div>
-      <div class="card"><h3>GPT-4o &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="gpt4o-test_report.html">Open report &rarr;</a></div>
-      <div class="card"><h3>Phi-2 &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="phi2-test_report.html">Open report &rarr;</a></div>
-      <div class="card"><h3>TinyLlama &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="TinyLlama-test_report.html">Open report &rarr;</a></div>
+    <p class="lead">Every diagnostic and case study emits a styled, self-contained HTML report (cost, accuracy, per-case detail) into <code>results/</code> when you run it.</p>
+    <p class="lead" style="font-size:.92rem;">Earlier sample reports were removed from this site because they were generated before the scoring and token-pricing fixes — rather than publish misleading numbers, the page links to the code so you can produce trustworthy reports yourself.</p>
+    <div class="btns" style="justify-content:flex-start;">
+      <a class="btn primary" style="color:#5b3fb9;background:#e6edf3;border-color:#e6edf3;" href="https://github.com/MalekSnous/llm-diagnostic-framework#-case-studies">How to run the studies &rarr;</a>
     </div>
   </div>
 </section>
