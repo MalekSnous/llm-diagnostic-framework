@@ -1,0 +1,45 @@
+AcmeCloud Platform — Internal Product Reference (v3.2)
+
+# Overview
+AcmeCloud is Acme Corp's internal data-orchestration platform. This document is
+the source of truth for support agents. The facts below are specific to AcmeCloud
+and are NOT public knowledge — a general-purpose LLM cannot know them without
+retrieval.
+
+# Plans and Limits
+The Starter plan allows up to 5 concurrent pipelines and 50 GB of managed storage.
+The Growth plan allows up to 50 concurrent pipelines and 2 TB of managed storage.
+The Enterprise plan allows unlimited concurrent pipelines and 40 TB of managed storage.
+Each plan includes a soft API rate limit of 600 requests per minute on Starter,
+3,000 requests per minute on Growth, and 20,000 requests per minute on Enterprise.
+
+# Authentication
+AcmeCloud uses a token called an "AKT" (Acme Key Token). AKTs expire after 14 days
+by default. An AKT can be rotated without downtime using the `acme auth rotate`
+command. Service accounts use a longer-lived token called an "AKT-S" which expires
+after 90 days.
+
+# Regions
+AcmeCloud is available in three regions: eu-paris-1, us-reston-2, and ap-osaka-3.
+The default region for new accounts created after January 2025 is eu-paris-1.
+Cross-region replication is only supported between eu-paris-1 and us-reston-2.
+
+# Billing
+Billing is computed per "ACU" (Acme Compute Unit). One ACU equals 4 vCPUs and
+16 GB of RAM running for one hour. The Growth plan includes 500 free ACUs per month;
+additional ACUs are billed at $0.08 each. Invoices are issued on the 3rd of each month.
+
+# Support SLAs
+Starter plan support response time is 48 business hours. Growth plan is 8 business
+hours. Enterprise plan is 1 hour for severity-1 incidents, 24/7. The escalation
+contact for severity-1 Enterprise incidents is the on-call address sev1@acmecloud.example.
+
+# Data Retention
+Pipeline logs are retained for 30 days on Starter, 180 days on Growth, and 400 days
+on Enterprise. Deleted datasets are recoverable from the trash for 21 days before
+permanent deletion.
+
+# Known Limitations
+The AcmeCloud Python SDK (package name `acmecloud-sdk`) requires Python 3.10 or newer.
+The legacy `acme-py` package is deprecated and will be removed in v4.0, scheduled for
+March 2026. Webhooks currently support a maximum payload of 256 KB.

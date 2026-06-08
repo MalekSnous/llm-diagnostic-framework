@@ -1,0 +1,12 @@
+Paris is the capital of France.
+The capital of Italy is Rome.
+Berlin is the capital of Germany.
+Madrid is the capital of Spain.
+2 + 2 = 4
+5 + 7 = 12
+10 - 3 = 7
+The Eiffel Tower is located in Paris.
+The Colosseum is located in Rome.
+William Shakespeare wrote Romeo and Juliet.
+The Earth orbits around the Sun.
+Water freezes at 0 degrees Celsius.

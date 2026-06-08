@@ -54,6 +54,9 @@ results/
 data/*.csv
 data/*.json
 data/*.txt
+# ...but keep the small, versioned corpora used by case studies and tests.
+!data/product_docs.txt
+!data/knowledge_base.txt
 *.log
 
 # Model weights and caches
