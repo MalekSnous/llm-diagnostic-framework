@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))  # so `from dataset import CASES` resolves
 
 from rich.console import Console
 from rich.table import Table
@@ -24,46 +25,13 @@ from llm_diagnostic.utils.case_study_reporter import CaseStudyReporter
 console = Console()
 
 
-# Sample medical data
-MEDICAL_TEXTS = [
-    "Patient John Doe, 45 years old, presents with hypertension and type 2 diabetes. Prescribed metformin 500mg twice daily.",
-    "Jane Smith, female, 32, diagnosed with asthma. Treatment includes albuterol inhaler as needed.",
-    "Robert Johnson, 67, admitted with acute myocardial infarction. Emergency angioplasty performed successfully.",
-    "Mary Brown, 28, pregnant, gestational diabetes detected. Insulin therapy initiated.",
-    "Patient presents with severe migraine headaches. Prescribed sumatriptan 100mg as needed.",
-    "Pt c/o CP, h/o MI 2y ago. PMH: HTN, DM2, HLD. Meds: ASA, metoprolol, lisinopril, atorvastatin.",
-    "36F G2P1 at 38w presents c/ ROM x 2h. FHR 140s, contractions q3min. Cx 4cm/80%/-1. Plan: EFM, await spontaneous labor.",
-    "CXR shows R lower lobe infiltrate. Dx: CAP. Started on Levaquin 750mg qd x 5d. F/u in 1wk or sooner if worsening.",
-]
+# Dataset lives in dataset.py (~100 cases across difficulty tiers). Derive the
+# parallel lists the scoring uses (index-based via test_case id "medical_<i>").
+from dataset import CASES  # noqa: E402  (local module; needs the path insert above)
 
-# Expected entities (simplified)
-EXPECTED_ENTITIES = [
-    ["John Doe", "hypertension", "type 2 diabetes", "metformin"],
-    ["Jane Smith", "asthma", "albuterol"],
-    ["Robert Johnson", "acute myocardial infarction", "angioplasty"],
-    ["Mary Brown", "pregnant", "gestational diabetes", "insulin"],
-    ["migraine", "sumatriptan"],
-    [
-        "chest pain",
-        "myocardial infarction",
-        "hypertension",
-        "diabetes",
-        "hyperlipidemia",
-        "aspirin",
-        "metoprolol",
-        "lisinopril",
-        "atorvastatin",
-    ],
-    [
-        "gravida 2 para 1",
-        "38 weeks",
-        "rupture of membranes",
-        "fetal heart rate",
-        "cervix",
-        "electronic fetal monitoring",
-    ],
-    ["chest x-ray", "right lower lobe", "infiltrate", "community-acquired pneumonia", "Levaquin"],
-]
+MEDICAL_TEXTS = [c["text"] for c in CASES]
+EXPECTED_ENTITIES = [c["entities"] for c in CASES]
+DIFFICULTIES = [c["difficulty"] for c in CASES]
 
 # Medical knowledge base for RAG
 MEDICAL_KB = [
@@ -114,18 +82,35 @@ def create_test_cases():
     """Create test cases for medical entity extraction."""
     test_cases = []
 
-    for i, (text, entities) in enumerate(zip(MEDICAL_TEXTS, EXPECTED_ENTITIES)):
+    for i, (text, entities, difficulty) in enumerate(
+        zip(MEDICAL_TEXTS, EXPECTED_ENTITIES, DIFFICULTIES)
+    ):
         test_cases.append(
             TestCase(
                 id=f"medical_{i}",
                 input=f"Extract medical entities (conditions, medications, procedures) from: {text}",
                 expected_output=", ".join(entities),
                 context=text,
-                metadata={"task": "entity_extraction", "domain": "medical"},
+                metadata={
+                    "task": "entity_extraction",
+                    "domain": "medical",
+                    "difficulty": difficulty,
+                },
             )
         )
 
     return test_cases
+
+
+def difficulty_breakdown(results):
+    """Mean F1 per difficulty tier, using the case id -> difficulty mapping."""
+    tiers = {}
+    for r in results:
+        idx = int(r.test_case_id.split("_")[1])
+        tier = DIFFICULTIES[idx]
+        tiers.setdefault(tier, []).append(r.metrics["f1"])
+    order = ["easy", "medium", "hard", "expert"]
+    return {t: sum(v) / len(v) for t in order if (v := tiers.get(t))}
 
 
 def run_baseline(test_cases, llm_client):
@@ -159,6 +144,11 @@ def run_baseline(test_cases, llm_client):
         f"[/yellow]"
     )
     console.print(f"[yellow]Baseline Cost: ${total_cost:.4f}[/yellow]")
+
+    by_diff = difficulty_breakdown(baseline_results)
+    if by_diff:
+        breakdown = "  ".join(f"{tier}={f1:.0%}" for tier, f1 in by_diff.items())
+        console.print(f"[dim]Baseline F1 by difficulty: {breakdown}[/dim]")
 
     return baseline_results, avg_f1, total_cost
 
