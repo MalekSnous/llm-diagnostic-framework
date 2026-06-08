@@ -347,11 +347,16 @@ def main():
     model_name = args.model
 
     # Hosted models need an API key; local HF models (e.g. microsoft/phi-2) don't.
-    if model_name.startswith(("gpt-", "claude-")):
-        key_var = "OPENAI_API_KEY" if model_name.startswith("gpt-") else "ANTHROPIC_API_KEY"
-        if not os.getenv(key_var):
-            console.print(f"[red]✗ {key_var} not set (required for {model_name}).[/red]")
-            return
+    key_var = None
+    if model_name.startswith("gpt-"):
+        key_var = "OPENAI_API_KEY"
+    elif model_name.startswith("claude-"):
+        key_var = "ANTHROPIC_API_KEY"
+    elif model_name.startswith("groq/"):
+        key_var = "GROQ_API_KEY"
+    if key_var and not os.getenv(key_var):
+        console.print(f"[red]✗ {key_var} not set (required for {model_name}).[/red]")
+        return
 
     # Initialize
     console.print("\n[bold]Initializing...[/bold]")

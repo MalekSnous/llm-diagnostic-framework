@@ -292,10 +292,50 @@ class HuggingFaceClient(BaseLLMClient):
         return [self.generate(p, max_tokens, temperature, **kwargs) for p in prompts]
 
 
-def get_llm_client(model_name: str, **kwargs) -> BaseLLMClient:
-    """Factory function to get appropriate LLM client."""
+class GroqClient(OpenAIClient):
+    """Groq client — OpenAI-compatible API, open-weight models (Llama, GPT-OSS, Qwen...).
 
-    if model_name.startswith("gpt-"):
+    Reuses OpenAIClient.generate / _calculate_cost (the chat-completions API and
+    the per-1K cost math are identical); only the endpoint, key, and pricing
+    table differ. Select via the ``groq/`` prefix, e.g.
+    ``get_llm_client("groq/llama-3.3-70b-versatile")``.
+    """
+
+    def __init__(self, model_name: str = "llama-3.3-70b-versatile", **kwargs):
+        # Skip OpenAIClient.__init__ (which would build an OpenAI client with
+        # OPENAI_API_KEY); set up the Groq-pointed client directly.
+        BaseLLMClient.__init__(self, model_name, **kwargs)
+        import openai
+
+        self.client = openai.OpenAI(
+            api_key=os.getenv("GROQ_API_KEY"),
+            base_url="https://api.groq.com/openai/v1",
+        )
+
+        # Pricing in USD per 1K tokens (Groq publishes per-1M; divide by 1000).
+        self.pricing = {
+            "llama-3.1-8b-instant": {"input": 0.00005, "output": 0.00008},
+            "llama-3.3-70b-versatile": {"input": 0.00059, "output": 0.00079},
+            "openai/gpt-oss-20b": {"input": 0.000075, "output": 0.0003},
+            "openai/gpt-oss-120b": {"input": 0.00015, "output": 0.0006},
+            "meta-llama/llama-4-scout-17b-16e-instruct": {"input": 0.00011, "output": 0.00034},
+            "qwen/qwen3-32b": {"input": 0.00029, "output": 0.00059},
+        }
+
+
+def get_llm_client(model_name: str, **kwargs) -> BaseLLMClient:
+    """Factory function to get appropriate LLM client.
+
+    Routing by prefix:
+    - ``gpt-*``   -> OpenAI
+    - ``claude-*``-> Anthropic
+    - ``groq/*``  -> Groq (OpenAI-compatible); the ``groq/`` prefix is stripped
+    - anything else -> local Hugging Face model
+    """
+
+    if model_name.startswith("groq/"):
+        return GroqClient(model_name[len("groq/") :], **kwargs)
+    elif model_name.startswith("gpt-"):
         return OpenAIClient(model_name, **kwargs)
     elif model_name.startswith("claude-"):
         return AnthropicClient(model_name, **kwargs)

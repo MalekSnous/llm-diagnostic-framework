@@ -37,6 +37,20 @@ def test_openai_pricing_table_present():
     assert "input" in client.pricing["gpt-4o-mini"]
 
 
+def test_groq_routing_and_pricing(monkeypatch):
+    """`groq/<model>` routes to GroqClient, strips the prefix, prices per-1K."""
+    from llm_diagnostic.core.llm_client import GroqClient
+
+    monkeypatch.setenv("GROQ_API_KEY", "dummy")
+    client = get_llm_client("groq/llama-3.3-70b-versatile")
+    assert isinstance(client, GroqClient)
+    assert client.model_name == "llama-3.3-70b-versatile"  # prefix stripped
+    # $0.59/$0.79 per 1M -> 1K in + 1K out should be well under $0.01.
+    cost = client._calculate_cost(1000, 1000)
+    assert abs(cost - (0.00059 + 0.00079)) < 1e-9
+    assert cost < 0.01
+
+
 def test_openai_cost_is_per_1k_not_per_1m():
     """Regression: pricing must be per-1K, so costs aren't inflated ~1000x.
 
