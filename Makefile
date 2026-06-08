@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal run-medical-study run-rag-study publish publish-only
+.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal run-medical-study run-rag-study publish publish-only compare-medical
 
 help:
 	@echo "LLM Diagnostic Framework - Available Commands"
@@ -25,6 +25,7 @@ help:
 	@echo "  make run-rag-study model=gpt-4o-mini"
 	@echo "  make publish model=gpt-4o-mini  - Run studies + publish reports to docs/"
 	@echo "  make publish-only               - Publish existing reports (no re-run)"
+	@echo "  make compare-medical            - Compare gpt-4o/gpt-4o-mini/phi-2/sonnet (medical, no RAG)"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make docker-build    - Build Docker image"
@@ -149,6 +150,19 @@ publish:
 # Only (re)publish reports that already exist in results/, without re-running.
 publish-only:
 	python scripts/publish_reports.py
+
+# Compare several models on the medical study in one command (RAG skipped — compare
+# it later). Study failures (missing key, no local model) are non-fatal.
+# Override the list:  make compare-medical models="gpt-4o gpt-4o-mini claude-sonnet-4-6"
+MEDICAL_MODELS ?= gpt-4o gpt-4o-mini microsoft/phi-2 claude-sonnet-4-6
+compare-medical:
+	@for m in $(or $(models),$(MEDICAL_MODELS)); do \
+	  echo "=== $$m ==="; \
+	  python case_studies/medical_entity_extraction/run_study.py --model $$m --skip-rag || true; \
+	done
+	python scripts/compare_models.py --study medical_entity_extraction
+	@echo ""
+	@echo "Comparison written to docs/comparison_medical_entity_extraction.html"
 
 # GitHub Actions locally (requires act)
 test-ci:

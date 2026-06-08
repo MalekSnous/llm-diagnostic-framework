@@ -138,14 +138,20 @@ class OpenAIClient(BaseLLMClient):
 class AnthropicClient(BaseLLMClient):
     """Anthropic API client (Claude)."""
 
-    def __init__(self, model_name: str = "claude-3-sonnet-20240229", **kwargs):
+    def __init__(self, model_name: str = "claude-sonnet-4-6", **kwargs):
         super().__init__(model_name, **kwargs)
         from anthropic import Anthropic
 
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-        # Pricing per 1M tokens
+        # Pricing per 1M tokens (Anthropic publishes per-1M; _calculate_cost
+        # divides by 1_000_000, so these values go in as-is).
         self.pricing = {
+            # Current models (Claude 4.x)
+            "claude-opus-4-8": {"input": 5.0, "output": 25.0},
+            "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
+            "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
+            # Legacy Claude 3
             "claude-3-opus-20240229": {"input": 15.0, "output": 75.0},
             "claude-3-sonnet-20240229": {"input": 3.0, "output": 15.0},
             "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},

@@ -19,7 +19,7 @@ from llm_diagnostic.failure_tests.base_test import TestCase, TestResult
 from llm_diagnostic.improvements.base_strategy import ImprovementResult
 from llm_diagnostic.improvements.prompt_engineering import PromptEngineeringStrategy
 from llm_diagnostic.improvements.rag_system import RAGSystem
-from llm_diagnostic.utils.case_study_reporter import save_case_study_results
+from llm_diagnostic.utils.case_study_reporter import CaseStudyReporter
 
 console = Console()
 
@@ -270,8 +270,8 @@ def run_rag_system(test_cases, baseline_results, llm_client):
     return result
 
 
-def generate_summary(baseline_acc, baseline_cost, prompt_result, rag_result):
-    """Generate final summary table."""
+def generate_summary(baseline_acc, baseline_cost, prompt_result, rag_result=None):
+    """Generate final summary table. rag_result is optional (RAG can be skipped)."""
     console.print("\n[bold cyan]═══════════════════════════════════════[/bold cyan]")
     console.print("[bold cyan]     CASE STUDY: FINAL SUMMARY       [/bold cyan]")
     console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]\n")
@@ -301,30 +301,30 @@ def generate_summary(baseline_acc, baseline_cost, prompt_result, rag_result):
         f"${prompt_cost_per_point:.2f}" if prompt_cost_per_point != float("inf") else "N/A",
     )
 
-    # RAG System
-    rag_acc = rag_result.improved_metrics.metrics.get("accuracy", 0)
-    rag_improvement = (rag_acc - baseline_acc) * 100
-    rag_cost_per_point = (
-        rag_result.total_cost / rag_improvement if rag_improvement > 0 else float("inf")
-    )
-
-    table.add_row(
-        "RAG System",
-        f"{rag_acc:.1%}",
-        f"+{rag_improvement:.1f}%",
-        f"${rag_result.total_cost:.4f}",
-        f"${rag_cost_per_point:.2f}" if rag_cost_per_point != float("inf") else "N/A",
-    )
+    # RAG System (optional)
+    rag_acc = None
+    if rag_result is not None:
+        rag_acc = rag_result.improved_metrics.metrics.get("accuracy", 0)
+        rag_improvement = (rag_acc - baseline_acc) * 100
+        rag_cost_per_point = (
+            rag_result.total_cost / rag_improvement if rag_improvement > 0 else float("inf")
+        )
+        table.add_row(
+            "RAG System",
+            f"{rag_acc:.1%}",
+            f"+{rag_improvement:.1f}%",
+            f"${rag_result.total_cost:.4f}",
+            f"${rag_cost_per_point:.2f}" if rag_cost_per_point != float("inf") else "N/A",
+        )
 
     console.print(table)
 
     # Recommendation
-    best_strategy = "RAG System" if rag_acc > prompt_acc else "Prompt Engineering"
-    console.print(f"\n[bold green]✓ Recommended: {best_strategy}[/bold green]")
-
-    if best_strategy == "RAG System":
+    if rag_acc is not None and rag_acc > prompt_acc:
+        console.print("\n[bold green]✓ Recommended: RAG System[/bold green]")
         console.print("  RAG provides domain knowledge augmentation, critical for medical accuracy")
     else:
+        console.print("\n[bold green]✓ Recommended: Prompt Engineering[/bold green]")
         console.print("  Prompt engineering sufficient for this task, lower cost")
 
 
@@ -338,6 +338,11 @@ def main():
 
     parser = argparse.ArgumentParser(description="Medical entity extraction case study")
     parser.add_argument("--model", default="gpt-4o-mini", help="Model to benchmark")
+    parser.add_argument(
+        "--skip-rag",
+        action="store_true",
+        help="Skip the RAG strategy (needs the [rag] extra; compare it later)",
+    )
     args = parser.parse_args()
     model_name = args.model
 
@@ -361,26 +366,29 @@ def main():
 
     # Run improvements
     prompt_result = run_prompt_engineering(test_cases, baseline_results, llm_client)
-    rag_result = run_rag_system(test_cases, baseline_results, llm_client)
+    rag_result = None if args.skip_rag else run_rag_system(test_cases, baseline_results, llm_client)
 
     # Generate summary
     generate_summary(baseline_acc, baseline_cost, prompt_result, rag_result)
 
-    # ============================================
-    # NOUVEAU : SAUVEGARDE AUTOMATIQUE
-    # ============================================
+    # Save JSON + HTML report (only the strategies that actually ran).
     console.print("\n[bold cyan]Saving results...[/bold cyan]")
 
-    json_path, html_path = save_case_study_results(
-        study_name="medical_entity_extraction",
-        model_name=model_name,
-        baseline_accuracy=baseline_acc,
-        baseline_cost=baseline_cost,
-        prompt_result=prompt_result,
-        rag_result=rag_result,
-        test_cases=test_cases,
-        output_dir="results/case_studies",
-    )
+    reporter = CaseStudyReporter("medical_entity_extraction")
+    baseline = {"accuracy": baseline_acc, "cost": baseline_cost}
+    improvements = {
+        "Prompt Engineering": {
+            "accuracy": prompt_result.improved_metrics.metrics.get("accuracy", 0),
+            "cost": prompt_result.total_cost,
+        }
+    }
+    if rag_result is not None:
+        improvements["RAG System"] = {
+            "accuracy": rag_result.improved_metrics.metrics.get("accuracy", 0),
+            "cost": rag_result.total_cost,
+        }
+    json_path = reporter.save_results(model_name, baseline, improvements)
+    html_path = reporter.generate_html_report(model_name, baseline, improvements)
 
     console.print(f"[green]✓ JSON saved: {json_path}[/green]")
     console.print(f"[green]✓ HTML report: {html_path}[/green]")
