@@ -32,8 +32,9 @@ strategy (prompt engineering, RAG, fine-tuning) under one harness, and reports
 > **Reproducibility note.** Earlier headline numbers in this README came from a
 > draft scoring method (recall-only substring match) and a token-pricing bug
 > (per-1M vs per-1K, ~1000× cost inflation). Both are now fixed and covered by
-> tests, so old figures were removed rather than shown misleadingly. Re-run the
-> case studies (below) to generate trustworthy numbers for your own setup.
+> tests. The figures in [Latest Results](#-latest-results-medical-entity-extraction)
+> come from a real run with that corrected scoring and pricing — re-run the case
+> studies to reproduce them for your own setup.
 
 **Qualitative lessons that hold up:**
 1. 📊 **Measure the baseline first** — optimization is not free lunch.
@@ -141,8 +142,43 @@ python case_studies/rag_document_qa/run_study.py --model gpt-4o-mini
 
 Each study writes a JSON + interactive HTML report to `results/case_studies/`.
 
-> Concrete numbers are intentionally **not** hard-coded here — run the studies with
-> your own models/keys to get figures you can trust. See the reproducibility note above.
+---
+
+## 📊 Latest Results (Medical Entity Extraction)
+
+Five models on the **same 97-case clinical dataset** (easy → expert difficulty),
+scored by entity-extraction **F1** (precision/recall, verbosity-robust) with
+**real token cost**. Baseline = zero-shot, +Prompt Eng = few-shot prompting.
+
+🔗 **Interactive version (with per-difficulty breakdown):** [maleksnous.github.io/llm-diagnostic-framework → Model comparison](https://maleksnous.github.io/llm-diagnostic-framework/comparison_medical_entity_extraction.html)
+
+| Model | Baseline F1 | +Prompt Eng | Δ (pts) | Cost (97 cases) |
+|-------|------------:|------------:|--------:|----------------:|
+| **gpt-4o** | 68.6% | **71.3%** | +2.8 | $0.043 |
+| **gpt-4o-mini** | 57.3% | **70.4%** | +13.1 | **$0.0032** |
+| claude-sonnet-4-6 | 11.4%* | 64.3% | +52.9 | $0.158 |
+| groq/llama-3.1-8b-instant | 58.2% | 61.7% | +3.5 | **$0.0012** |
+| groq/llama-3.3-70b-versatile | 57.8% | 59.2% | +1.4 | $0.013 |
+
+### Interpretation
+
+1. **gpt-4o-mini is the value winner.** With prompt engineering it reaches **70.4% F1**
+   — within ~1 point of gpt-4o (71.3%) — at roughly **13× lower cost**. For this task,
+   the premium model isn't worth it.
+2. **A low baseline ≠ a weak model.** Sonnet's 11.4% baseline (*) is largely a
+   **formatting artifact**: it answered in prose, which the entity parser penalizes.
+   Few-shot prompting standardized the output format and F1 jumped to 64.3%. Read the
+   baseline→prompt delta as much about **output format** as raw capability.
+3. **Bigger ≠ better.** Llama-3.3-70B (59.2%) does **not** beat Llama-3.1-8B (61.7%) here,
+   despite ~9× the parameters and ~11× the cost — match model size to the task.
+4. **Prompt engineering's main job here is standardizing output**, so its biggest gains
+   land on the models whose baseline format was poorest (Sonnet, gpt-4o-mini).
+5. **Cost spans ~135×** across models (Sonnet vs Llama-3.1-8B) — always judge
+   **cost per quality point**, not raw F1.
+
+> Snapshot of one run (June 2026, RAG excluded). Small sample (97 cases) and a
+> containment-based metric sensitive to output format — treat as a methodology
+> demonstration, not a leaderboard. Re-run to reproduce.
 
 ---
 
