@@ -2,8 +2,12 @@
 
 > **A Systematic Approach to LLM Performance Analysis**: Diagnose failures, test improvements, and make data-driven decisions about LLM optimization strategies.
 
+[![CI](https://github.com/MalekSnous/llm-diagnostic-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/MalekSnous/llm-diagnostic-framework/actions/workflows/ci.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**🔗 Live demo & interactive reports → [maleksnous.github.io/llm-diagnostic-framework](https://maleksnous.github.io/llm-diagnostic-framework/)**
 
 ---
 
@@ -38,7 +42,18 @@ Our medical entity extraction case study revealed **counterintuitive results**:
 ```bash
 git clone https://github.com/MalekSnous/llm-diagnostic-framework.git
 cd llm-diagnostic-framework
-pip install -e .
+pip install -e .            # core + hosted API clients (OpenAI/Anthropic)
+```
+
+The core install is lightweight. Heavy ML backends are **opt-in extras** (imported
+lazily, so the framework works without them):
+
+```bash
+pip install -e ".[rag]"        # RAG strategy (sentence-transformers + chromadb)
+pip install -e ".[local]"      # local Hugging Face models (torch + transformers)
+pip install -e ".[finetune]"   # LoRA fine-tuning
+pip install -e ".[dev]"        # tests + linters
+pip install -e ".[all]"        # everything
 ```
 
 ### Run Your First Diagnostic
@@ -246,21 +261,20 @@ llm-diagnostic-framework/
 │   │   ├── prompt_engineering.py
 │   │   ├── rag_system.py
 │   │   └── base_strategy.py
-│   └── utils/                   # Helpers
-│       └── case_study_reporter.py  # HTML report generation
+│   ├── utils/                   # Helpers
+│   │   └── case_study_reporter.py  # HTML report generation
+│   └── cli.py                   # Console entry points (llm-diagnose/-improve/-report)
 ├── scripts/                     # CLI tools
 │   ├── run_diagnostics.py
 │   ├── run_improvements.py
 │   └── generate_report.py
 ├── case_studies/                # Complete examples
-│   └── medical_entity_extraction/
-│       ├── run_study.py
-│       └── README.md
-├── results/                     # Output reports
-│   ├── diagnostics/
-│   ├── improvements/
-│   └── case_studies/
-└── tests/                       # Unit tests
+│   ├── medical_entity_extraction/   # RAG/prompting can *hurt* a strong model
+│   └── rag_document_qa/             # RAG *wins* on private-document QA
+├── data/                        # Domain data (knowledge bases, doc corpora)
+├── results/                     # Output reports (JSON + HTML)
+├── tests/                       # Offline pytest suite (mocked LLM client)
+└── .github/workflows/ci.yml     # Lint + type-check + tests on 3.9–3.11
 ```
 
 ---
@@ -305,19 +319,30 @@ Phi-2 (2.7B params) gained **+28%** from prompt engineering:
 
 ## 🧪 Running Tests
 
+The test suite is **fully offline** — it uses a deterministic mock LLM client
+(`tests/conftest.py`), so it needs no API keys, makes no network calls, and
+downloads no models.
+
 ```bash
-# Install dev dependencies
+# Install dev dependencies + git hooks
 pip install -e ".[dev]"
+pre-commit install
 
-# Run test suite
-pytest tests/ -v
+# Run the suite (with coverage, per pyproject config)
+make test            # or: pytest
 
-# Run with coverage
-pytest tests/ --cov=llm_diagnostic --cov-report=html
+# Lint + type-check (matches CI)
+make lint            # ruff + black --check + isort --check + mypy
 
-# Format code
-black llm_diagnostic/ scripts/ tests/
+# Auto-format
+make format          # ruff --fix + black + isort
 ```
+
+### Continuous Integration
+
+`.github/workflows/ci.yml` runs lint, format checks, mypy, and the test suite on
+Python 3.9 / 3.10 / 3.11 for every push and pull request. Because tests are mocked,
+**CI requires no API keys and incurs no cost.**
 
 ---
 
