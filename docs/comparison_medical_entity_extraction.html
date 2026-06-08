@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Model comparison — medical entity extraction</title>
+<style>
+ body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#e6edf3;max-width:860px;margin:40px auto;padding:0 20px;line-height:1.6}
+ h1{font-size:1.7rem} h2{font-size:1.25rem;margin-top:34px} a{color:#6e8efb}
+ table{width:100%;border-collapse:collapse;background:#161b22;border-radius:10px;overflow:hidden;margin:12px 0}
+ th,td{padding:10px 14px;text-align:right;border-bottom:1px solid #30363d}
+ th:first-child,td:first-child{text-align:left}
+ th{background:#1f2630} .pos{color:#3fb950} .neg{color:#f85149}
+ .lead{color:#9da7b3}
+</style></head><body>
+<h1>📊 Model comparison — medical entity extraction</h1>
+<p class="lead">Same 97-case clinical dataset (easy → expert), one harness. Quality is
+entity-extraction <strong>F1</strong> (precision/recall, verbosity-robust); cost is real
+token cost. Baseline = zero-shot; +Prompt Eng = few-shot prompting.</p>
+<table><thead><tr><th>Model</th><th>Baseline F1</th><th>+Prompt Eng</th><th>Δ (pts)</th><th>Cost (USD)</th></tr></thead>
+<tbody>
+<tr><td>claude-sonnet-4-6</td><td>11.4%</td><td>64.3%</td><td class='pos'>+52.9</td><td>$0.1576</td></tr>
+<tr><td>gpt-4o</td><td>68.6%</td><td>71.3%</td><td class='pos'>+2.8</td><td>$0.0434</td></tr>
+<tr><td>gpt-4o-mini</td><td>57.3%</td><td>70.4%</td><td class='pos'>+13.1</td><td>$0.0032</td></tr>
+<tr><td>groq/llama-3.1-8b-instant</td><td>58.2%</td><td>61.7%</td><td class='pos'>+3.5</td><td>$0.0012</td></tr>
+<tr><td>groq/llama-3.3-70b-versatile</td><td>57.8%</td><td>59.2%</td><td class='pos'>+1.4</td><td>$0.0133</td></tr>
+</tbody></table>
+<h2>Baseline F1 by difficulty</h2><p><em>No per-difficulty data in these runs — re-run the studies (the saver now captures it) to populate this table.</em></p>
+<h2>Findings</h2><ul><li>Best quality: gpt-4o reaches F1 71.3%.</li><li>Prompt engineering helps most on claude-sonnet-4-6 (+52.9 F1 points).</li><li>Low baseline ≠ weak model: claude-sonnet-4-6 scored low at baseline mainly by answering in prose; few-shot standardised the output format (hence the large jump). Read baseline-vs-prompt as much about output format as raw capability.</li><li>Cost spread is huge: claude-sonnet-4-6 costs ~135× more than groq/llama-3.1-8b-instant for this run.</li><li>Best value (F1 per $): groq/llama-3.1-8b-instant.</li></ul>
+<p style="margin-top:28px"><a href="index.html">&larr; Back to overview</a></p>
+</body></html>

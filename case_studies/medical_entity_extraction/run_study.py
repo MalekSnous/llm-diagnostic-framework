@@ -192,6 +192,9 @@ def run_prompt_engineering(test_cases, baseline_results, llm_client):
 
     improved_metrics = EvaluationMetrics()
     improved_metrics.add_metric("accuracy", improved_accuracy)
+    improved_metrics.add_metric("precision", _mean(improved_results, "precision"))
+    improved_metrics.add_metric("recall", _mean(improved_results, "recall"))
+    improved_metrics.add_details("by_difficulty", difficulty_breakdown(improved_results))
 
     result = ImprovementResult(
         strategy_name="Prompt Engineering",
@@ -246,6 +249,9 @@ def run_rag_system(test_cases, baseline_results, llm_client):
 
     improved_metrics = EvaluationMetrics()
     improved_metrics.add_metric("accuracy", improved_accuracy)
+    improved_metrics.add_metric("precision", _mean(improved_results, "precision"))
+    improved_metrics.add_metric("recall", _mean(improved_results, "recall"))
+    improved_metrics.add_details("by_difficulty", difficulty_breakdown(improved_results))
 
     result = ImprovementResult(
         strategy_name="RAG System",
@@ -369,19 +375,28 @@ def main():
     # Save JSON + HTML report (only the strategies that actually ran).
     console.print("\n[bold cyan]Saving results...[/bold cyan]")
 
-    reporter = CaseStudyReporter("medical_entity_extraction")
-    baseline = {"accuracy": baseline_acc, "cost": baseline_cost}
-    improvements = {
-        "Prompt Engineering": {
-            "accuracy": prompt_result.improved_metrics.metrics.get("accuracy", 0),
-            "cost": prompt_result.total_cost,
+    def _entry(metrics, cost):
+        return {
+            "accuracy": metrics.metrics.get("accuracy", 0),
+            "precision": metrics.metrics.get("precision", 0),
+            "recall": metrics.metrics.get("recall", 0),
+            "cost": cost,
+            "by_difficulty": metrics.details.get("by_difficulty", {}),
         }
+
+    reporter = CaseStudyReporter("medical_entity_extraction")
+    baseline = {
+        "accuracy": baseline_acc,
+        "precision": _mean(baseline_results, "precision"),
+        "recall": _mean(baseline_results, "recall"),
+        "cost": baseline_cost,
+        "by_difficulty": difficulty_breakdown(baseline_results),
+    }
+    improvements = {
+        "Prompt Engineering": _entry(prompt_result.improved_metrics, prompt_result.total_cost)
     }
     if rag_result is not None:
-        improvements["RAG System"] = {
-            "accuracy": rag_result.improved_metrics.metrics.get("accuracy", 0),
-            "cost": rag_result.total_cost,
-        }
+        improvements["RAG System"] = _entry(rag_result.improved_metrics, rag_result.total_cost)
     json_path = reporter.save_results(model_name, baseline, improvements)
     html_path = reporter.generate_html_report(model_name, baseline, improvements)
 
