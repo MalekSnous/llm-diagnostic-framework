@@ -14,24 +14,24 @@ __author__ = "Malek Senoussi"
 __email__ = "malek.senoussi@gmail.com"
 
 # Core imports
-from .core.llm_client import get_llm_client, LLMResponse, BaseLLMClient
-from .core.evaluator import Evaluator, EvaluationMetrics
+from .core.evaluator import EvaluationMetrics, Evaluator
+from .core.llm_client import BaseLLMClient, LLMResponse, get_llm_client
+
+# Base classes (for custom implementations)
+from .failure_tests.base_test import BaseFailureTest, TestCase, TestResult
 
 # Failure tests
 from .failure_tests.context_limits import ContextLimitsTest
-from .failure_tests.reasoning_depth import ReasoningDepthTest
-from .failure_tests.knowledge_boundaries import KnowledgeBoundariesTest
-from .failure_tests.structure_validation import StructureValidationTest
 from .failure_tests.hallucination_patterns import HallucinationPatternsTest
+from .failure_tests.knowledge_boundaries import KnowledgeBoundariesTest
+from .failure_tests.reasoning_depth import ReasoningDepthTest
+from .failure_tests.structure_validation import StructureValidationTest
+from .improvements.base_strategy import BaseImprovementStrategy, ImprovementConfig
+from .improvements.fine_tuning import FineTuningStrategy
 
 # Improvement strategies
 from .improvements.prompt_engineering import PromptEngineeringStrategy
 from .improvements.rag_system import RAGSystem
-from .improvements.fine_tuning import FineTuningStrategy
-
-# Base classes (for custom implementations)
-from .failure_tests.base_test import BaseFailureTest, TestCase, TestResult
-from .improvements.base_strategy import BaseImprovementStrategy, ImprovementConfig
 
 __all__ = [
     # Core
@@ -40,19 +40,16 @@ __all__ = [
     "BaseLLMClient",
     "Evaluator",
     "EvaluationMetrics",
-    
     # Tests
     "ContextLimitsTest",
     "ReasoningDepthTest",
     "KnowledgeBoundariesTest",
     "StructureValidationTest",
     "HallucinationPatternsTest",
-    
     # Improvements
     "PromptEngineeringStrategy",
     "RAGSystem",
     "FineTuningStrategy",
-    
     # Base classes
     "BaseFailureTest",
     "TestCase",

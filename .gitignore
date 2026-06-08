@@ -74,4 +74,5 @@ site/
 
 # Distribution
 *.whl
-*.tar.gz.env
+*.tar.gz
+.env

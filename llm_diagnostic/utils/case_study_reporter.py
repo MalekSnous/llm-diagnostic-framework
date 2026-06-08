@@ -5,32 +5,29 @@ Module pour sauvegarder et générer des rapports pour les case studies.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 class CaseStudyReporter:
     """Gère la sauvegarde et les rapports des case studies."""
-    
+
     def __init__(self, study_name: str, output_dir: str = "results/case_studies"):
         self.study_name = study_name
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
     def save_results(
-        self,
-        model_name: str,
-        baseline_results: Dict[str, Any],
-        improvement_results: Dict[str, Any]
+        self, model_name: str, baseline_results: Dict[str, Any], improvement_results: Dict[str, Any]
     ) -> Path:
         """
         Sauvegarde les résultats en JSON.
-        
+
         Args:
             model_name: Nom du modèle utilisé
             baseline_results: Résultats baseline
             improvement_results: Dict des résultats d'amélioration par stratégie
-            
+
         Returns:
             Path du fichier JSON sauvegardé
         """
@@ -40,101 +37,96 @@ class CaseStudyReporter:
             "timestamp": self.timestamp,
             "baseline": baseline_results,
             "improvements": improvement_results,
-            "summary": self._generate_summary(baseline_results, improvement_results)
+            "summary": self._generate_summary(baseline_results, improvement_results),
         }
-        
+
         # Sauvegarder en JSON
         filename = f"{self.study_name}_{model_name.replace('/', '_')}_{self.timestamp}.json"
         filepath = self.output_dir / filename
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
-        
+
         return filepath
-    
+
     def _generate_summary(
-        self,
-        baseline: Dict[str, Any],
-        improvements: Dict[str, Any]
+        self, baseline: Dict[str, Any], improvements: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Génère un résumé des résultats."""
         baseline_acc = baseline.get("accuracy", 0)
-        
+
         summary = {
             "baseline_accuracy": baseline_acc,
             "best_strategy": None,
             "best_improvement": 0,
-            "strategies": {}
+            "strategies": {},
         }
-        
+
         best_acc = baseline_acc
         best_strategy = "baseline"
-        
+
         for strategy_name, result in improvements.items():
             acc = result.get("accuracy", 0)
             improvement = acc - baseline_acc
-            
+
             summary["strategies"][strategy_name] = {
                 "accuracy": acc,
                 "improvement": improvement,
-                "improvement_pct": improvement * 100
+                "improvement_pct": improvement * 100,
             }
-            
+
             if acc > best_acc:
                 best_acc = acc
                 best_strategy = strategy_name
                 summary["best_improvement"] = improvement
-        
+
         summary["best_strategy"] = best_strategy
-        
+
         return summary
-    
+
     def generate_html_report(
         self,
         model_name: str,
         baseline_results: Dict[str, Any],
         improvement_results: Dict[str, Any],
-        test_cases_details: List[Dict[str, Any]] = None
+        test_cases_details: List[Dict[str, Any]] = None,
     ) -> Path:
         """
         Génère un rapport HTML complet.
-        
+
         Args:
             model_name: Nom du modèle
             baseline_results: Résultats baseline
             improvement_results: Résultats des améliorations
             test_cases_details: Détails des test cases (optionnel)
-            
+
         Returns:
             Path du fichier HTML
         """
         html_content = self._build_html(
-            model_name,
-            baseline_results,
-            improvement_results,
-            test_cases_details
+            model_name, baseline_results, improvement_results, test_cases_details
         )
-        
+
         filename = f"{self.study_name}_{model_name.replace('/', '_')}_{self.timestamp}.html"
         filepath = self.output_dir / filename
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             f.write(html_content)
-        
+
         return filepath
-    
+
     def _build_html(
         self,
         model_name: str,
         baseline: Dict[str, Any],
         improvements: Dict[str, Any],
-        test_cases: List[Dict[str, Any]] = None
+        test_cases: List[Dict[str, Any]] = None,
     ) -> str:
         """Construit le HTML du rapport."""
-        
+
         baseline_acc = baseline.get("accuracy", 0)
         baseline_cost = baseline.get("cost", 0)
-        
+
         # Tableau des résultats
         results_rows = f"""
             <tr>
@@ -145,13 +137,13 @@ class CaseStudyReporter:
                 <td>-</td>
             </tr>
         """
-        
+
         for strategy_name, result in improvements.items():
             acc = result.get("accuracy", 0)
             cost = result.get("cost", 0)
             improvement = (acc - baseline_acc) * 100
             cost_per_point = cost / improvement if improvement > 0 else 0
-            
+
             results_rows += f"""
             <tr>
                 <td><strong>{strategy_name}</strong></td>
@@ -161,7 +153,7 @@ class CaseStudyReporter:
                 <td>${cost_per_point:.2f}</td>
             </tr>
             """
-        
+
         # Section des test cases (si fournis)
         test_cases_section = ""
         if test_cases:
@@ -177,7 +169,7 @@ class CaseStudyReporter:
                     </td>
                 </tr>
                 """
-            
+
             test_cases_section = f"""
             <div class="section">
                 <h2>📋 Test Cases Details</h2>
@@ -196,7 +188,7 @@ class CaseStudyReporter:
                 </table>
             </div>
             """
-        
+
         html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -442,7 +434,7 @@ class CaseStudyReporter:
 </body>
 </html>
         """
-        
+
         return html
 
 
@@ -454,34 +446,31 @@ def save_case_study_results(
     prompt_result: Any,
     rag_result: Any,
     test_cases: List[Any] = None,
-    output_dir: str = "results/case_studies"
+    output_dir: str = "results/case_studies",
 ) -> tuple:
     """
     Fonction helper pour sauvegarder facilement les résultats d'un case study.
-    
+
     Returns:
         tuple: (json_path, html_path)
     """
     reporter = CaseStudyReporter(study_name, output_dir)
-    
+
     # Préparer les données baseline
-    baseline_results = {
-        "accuracy": baseline_accuracy,
-        "cost": baseline_cost
-    }
-    
+    baseline_results = {"accuracy": baseline_accuracy, "cost": baseline_cost}
+
     # Préparer les résultats d'amélioration
     improvement_results = {
         "Prompt Engineering": {
             "accuracy": prompt_result.improved_metrics.metrics.get("accuracy", 0),
-            "cost": prompt_result.total_cost
+            "cost": prompt_result.total_cost,
         },
         "RAG System": {
             "accuracy": rag_result.improved_metrics.metrics.get("accuracy", 0),
-            "cost": rag_result.total_cost
-        }
+            "cost": rag_result.total_cost,
+        },
     }
-    
+
     # Préparer les détails des test cases (optionnel)
     test_cases_details = None
     if test_cases:
@@ -489,20 +478,17 @@ def save_case_study_results(
             {
                 "input": tc.input,
                 "expected": tc.expected_output,
-                "success": True  # À ajuster selon vos besoins
+                "success": True,  # À ajuster selon vos besoins
             }
             for tc in test_cases
         ]
-    
+
     # Sauvegarder JSON
     json_path = reporter.save_results(model_name, baseline_results, improvement_results)
-    
+
     # Générer HTML
     html_path = reporter.generate_html_report(
-        model_name,
-        baseline_results,
-        improvement_results,
-        test_cases_details
+        model_name, baseline_results, improvement_results, test_cases_details
     )
-    
+
     return json_path, html_path

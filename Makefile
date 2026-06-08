@@ -51,12 +51,15 @@ test-cov:
 	@echo "Coverage report generated in htmlcov/index.html"
 
 lint:
-	flake8 llm_diagnostic/ tests/
+	ruff check .
+	black --check .
+	isort --check-only .
 	mypy llm_diagnostic/
 
 format:
-	black llm_diagnostic/ tests/ scripts/
-	isort llm_diagnostic/ tests/ scripts/
+	ruff check . --fix
+	black .
+	isort .
 
 clean:
 	rm -rf build/
@@ -120,8 +123,8 @@ download-models:
 run-medical-study:
 	python case_studies/medical_entity_extraction/run_study.py
 
-run-code-study:
-	python case_studies/code_generation/run_study.py
+run-rag-study:
+	python case_studies/rag_document_qa/run_study.py --model $(or $(model),gpt-4o-mini)
 
 # GitHub Actions locally (requires act)
 test-ci:

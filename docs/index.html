@@ -1,23 +1,169 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>LLM Diagnostic Framework - Reports</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; }
-        h1 { color: #333; }
-        .report-list { list-style: none; padding: 0; }
-        .report-list li { padding: 10px; margin: 10px 0; background: #f5f5f5; border-radius: 5px; }
-        a { color: #0066cc; text-decoration: none; }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LLM Diagnostic Framework — Cost/Performance Benchmarking</title>
+<meta name="description" content="A systematic framework to diagnose LLM failures and benchmark prompt engineering, RAG and fine-tuning by cost and performance — with real, counterintuitive results." />
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #9da7b3; --accent: #6e8efb; --accent2: #a777e3;
+    --good: #3fb950; --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+    color: #fff; padding: 72px 20px 64px; text-align: center;
+  }
+  .hero h1 { font-size: 2.6rem; margin: 0 0 12px; font-weight: 800; }
+  .hero p { font-size: 1.2rem; max-width: 680px; margin: 0 auto 28px; opacity: .95; }
+  .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 12px 22px; border-radius: 8px; font-weight: 600;
+    background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.4);
+  }
+  .btn.primary { background: #fff; color: #5b3fb9; border-color: #fff; }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+
+  section { padding: 52px 0; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.7rem; margin: 0 0 8px; }
+  .lead { color: var(--muted); margin: 0 0 28px; }
+
+  /* Findings table */
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: #1f2630; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .pos { color: var(--good); font-weight: 600; }
+  .neg { color: var(--bad); font-weight: 600; }
+
+  /* Cards */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px; transition: border-color .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card h3 { margin: 0 0 6px; font-size: 1.1rem; }
+  .card p { color: var(--muted); margin: 0 0 14px; font-size: .95rem; }
+  .tag { display: inline-block; font-size: .72rem; padding: 2px 8px; border-radius: 999px;
+         background: rgba(110,142,251,.18); color: #aebdfb; margin-bottom: 10px; }
+
+  .takeaways li { margin: 8px 0; }
+  footer { padding: 36px 0; text-align: center; color: var(--muted); font-size: .9rem; }
+  code { background: #1f2630; padding: 2px 6px; border-radius: 5px; font-size: .88em; }
+  pre { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; overflow: auto; }
+  pre code { background: none; padding: 0; }
+</style>
 </head>
 <body>
-    <h1>📊 LLM Diagnostic Framework - Reports</h1>
-    <ul class="report-list">
-        <li><a href="medical_entity_extraction_gpt-4o-mini_20251228_234355.html">GPT-4o-mini Case Study</a></li>
-        <li><a href="medical_entity_extraction_gpt-4o_20251228_234537.html">GPT-4o Case Study</a></li>
-        <li><a href="medical_entity_extraction_microsoft_phi-2_20251228_171544.html">Phi-2 Case Study</a></li>
-        <li><a href="gpt4o-mini-test_report.html">GPT-4o-mini Diagnostics</a></li>
-        <li><a href="gpt4o-test_report.html">GPT-4o Diagnostics</a></li>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>📊 LLM Diagnostic Framework</h1>
+    <p>A systematic way to diagnose LLM failures and benchmark <strong>prompt engineering</strong>, <strong>RAG</strong> and <strong>fine-tuning</strong> by <strong>cost and performance</strong> — measuring, not guessing.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/MalekSnous/llm-diagnostic-framework">View on GitHub</a>
+      <a class="btn" href="#reports">Browse the reports</a>
+    </div>
+  </div>
+</header>
+
+<section id="insight">
+  <div class="wrap">
+    <h2>The key insight: optimization can <em>hurt</em></h2>
+    <p class="lead">Real results from the medical entity-extraction case study — bigger isn't better, and generic "best practices" can degrade a strong model.</p>
+    <table>
+      <thead>
+        <tr><th>Model</th><th>Baseline</th><th>+ Prompt Eng.</th><th>+ RAG</th><th>Cost (8 cases)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>GPT-4o-mini</strong></td><td>75.6%</td><td class="neg">71.0% (&minus;4.6%)</td><td class="neg">66.9% (&minus;8.8%)</td><td>$0.41</td></tr>
+        <tr><td><strong>GPT-4o</strong></td><td>71.5%</td><td class="neg">68.5% (&minus;2.9%)</td><td class="neg">64.8% (&minus;6.7%)</td><td>$4.06</td></tr>
+        <tr><td><strong>Phi-2 (local)</strong></td><td>71.7%</td><td class="pos">100% (+28.3%)</td><td class="pos">90% (+18.3%)</td><td>$0.00</td></tr>
+      </tbody>
+    </table>
+    <ul class="takeaways">
+      <li>✅ <strong>Smaller models benefit most</strong> from optimization (Phi-2: +28%).</li>
+      <li>❌ <strong>Strong models can degrade</strong> with generic strategies (GPT-4o-mini: &minus;8.8%).</li>
+      <li>💰 <strong>GPT-4o cost 10&times; more</strong> yet performed worse than GPT-4o-mini.</li>
+      <li>📊 <strong>Baseline testing is mandatory</strong> — theory doesn't predict real performance.</li>
     </ul>
+  </div>
+</section>
+
+<section id="case-studies">
+  <div class="wrap">
+    <h2>Case studies</h2>
+    <p class="lead">Two studies that tell opposite stories — which is exactly the point.</p>
+    <div class="grid">
+      <div class="card">
+        <span class="tag">Entity extraction</span>
+        <h3>Medical Entity Extraction</h3>
+        <p>When generic RAG and few-shot prompting <em>degrade</em> an already-strong model. Full cost/accuracy breakdown across 4 models.</p>
+        <a href="medical_entity_extraction_gpt-4o-mini_20251228_234355.html">Open interactive report &rarr;</a>
+      </div>
+      <div class="card">
+        <span class="tag">RAG &middot; Document QA</span>
+        <h3>Document QA with RAG</h3>
+        <p>The opposite case: questions about a private document the model was never trained on, where retrieval is what unlocks accuracy.</p>
+        <a href="https://github.com/MalekSnous/llm-diagnostic-framework/tree/main/case_studies/rag_document_qa">See the study on GitHub &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="reports">
+  <div class="wrap">
+    <h2>Interactive reports</h2>
+    <p class="lead">Auto-generated HTML reports produced by the framework.</p>
+    <div class="grid">
+      <div class="card"><h3>GPT-4o-mini &mdash; Case study</h3><p>Baseline vs prompt engineering vs RAG.</p><a href="medical_entity_extraction_gpt-4o-mini_20251228_234355.html">Open report &rarr;</a></div>
+      <div class="card"><h3>GPT-4o &mdash; Case study</h3><p>Premium model, worse value.</p><a href="medical_entity_extraction_gpt-4o_20251228_234537.html">Open report &rarr;</a></div>
+      <div class="card"><h3>Phi-2 &mdash; Case study</h3><p>Local model, biggest optimization gains.</p><a href="medical_entity_extraction_microsoft_phi-2_20251228_171544.html">Open report &rarr;</a></div>
+      <div class="card"><h3>GPT-4o-mini &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="gpt4o-mini-test_report.html">Open report &rarr;</a></div>
+      <div class="card"><h3>GPT-4o &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="gpt4o-test_report.html">Open report &rarr;</a></div>
+      <div class="card"><h3>Phi-2 &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="phi2-test_report.html">Open report &rarr;</a></div>
+      <div class="card"><h3>TinyLlama &mdash; Diagnostics</h3><p>Failure-mode diagnostics suite.</p><a href="TinyLlama-test_report.html">Open report &rarr;</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="try">
+  <div class="wrap">
+    <h2>Try it in 30 seconds</h2>
+    <p class="lead">The test suite is fully offline (mocked LLM client) — no API key needed to run it.</p>
+    <pre><code>git clone https://github.com/MalekSnous/llm-diagnostic-framework.git
+cd llm-diagnostic-framework
+pip install -e ".[dev]"
+make test                      # offline, no cost
+
+# Run the RAG document-QA study (needs an API key)
+pip install -e ".[rag]"
+make run-rag-study model=gpt-4o-mini</code></pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><strong>Malek Senoussi, PhD</strong> &middot; Machine Learning / AI Engineer</p>
+    <p>
+      <a href="https://github.com/MalekSnous/llm-diagnostic-framework">GitHub</a> &middot;
+      <a href="https://linkedin.com/in/maleksen">LinkedIn</a> &middot;
+      <a href="mailto:malek.senoussi@gmail.com">Email</a>
+    </p>
+  </div>
+</footer>
+
 </body>
 </html>

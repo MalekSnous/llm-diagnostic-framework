@@ -7,18 +7,22 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-import openai
-from anthropic import Anthropic
-from dotenv import load_dotenv
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+# Provider SDKs (openai, anthropic, transformers, torch) are imported lazily
+# inside each client so that importing this module — and the package as a whole
+# — does not require every backend to be installed. This keeps test/CI
+# environments lightweight and lets users install only the providers they use.
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:  # pragma: no cover - dotenv is optional
+    pass
 
 
 class LLMResponse:
     """Standardized LLM response format."""
-    
+
     def __init__(
         self,
         text: str,
@@ -26,7 +30,7 @@ class LLMResponse:
         tokens_used: int,
         latency_ms: float,
         cost_usd: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         self.text = text
         self.model = model
@@ -38,29 +42,21 @@ class LLMResponse:
 
 class BaseLLMClient(ABC):
     """Abstract base class for LLM clients."""
-    
+
     def __init__(self, model_name: str, **kwargs):
         self.model_name = model_name
         self.config = kwargs
-    
+
     @abstractmethod
     def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompt: str, max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> LLMResponse:
         """Generate response from LLM."""
         pass
-    
+
     @abstractmethod
     def batch_generate(
-        self,
-        prompts: List[str],
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompts: List[str], max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> List[LLMResponse]:
         """Generate responses for multiple prompts."""
         pass
@@ -68,11 +64,13 @@ class BaseLLMClient(ABC):
 
 class OpenAIClient(BaseLLMClient):
     """OpenAI API client (GPT-4, GPT-3.5)."""
-    
+
     def __init__(self, model_name: str = "gpt-4o-mini", **kwargs):
         super().__init__(model_name, **kwargs)
+        import openai
+
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
+
         # Pricing per 1K tokens (approximate, update as needed)
         self.pricing = {
             "gpt-4-turbo-preview": {"input": 0.01, "output": 0.03},
@@ -82,33 +80,30 @@ class OpenAIClient(BaseLLMClient):
             "gpt-4-turbo": {"input": 10.00, "output": 30.00},
             "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
         }
-    
+
     def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 300,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompt: str, max_tokens: int = 300, temperature: float = 0.0, **kwargs
     ) -> LLMResponse:
         """Generate response using OpenAI API."""
         import time
+
         start = time.time()
-        
+
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=temperature,
-            **kwargs
+            **kwargs,
         )
-        
+
         latency_ms = (time.time() - start) * 1000
-        
+
         # Calculate cost
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
         cost = self._calculate_cost(input_tokens, output_tokens)
-        
+
         return LLMResponse(
             text=response.choices[0].message.content,
             model=self.model_name,
@@ -118,20 +113,16 @@ class OpenAIClient(BaseLLMClient):
             metadata={
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
-                "finish_reason": response.choices[0].finish_reason
-            }
+                "finish_reason": response.choices[0].finish_reason,
+            },
         )
-    
+
     def batch_generate(
-        self,
-        prompts: List[str],
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompts: List[str], max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> List[LLMResponse]:
         """Generate responses for multiple prompts."""
         return [self.generate(p, max_tokens, temperature, **kwargs) for p in prompts]
-    
+
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate cost in USD."""
         pricing = self.pricing.get(self.model_name, {"input": 0, "output": 0})
@@ -142,44 +133,43 @@ class OpenAIClient(BaseLLMClient):
 
 class AnthropicClient(BaseLLMClient):
     """Anthropic API client (Claude)."""
-    
+
     def __init__(self, model_name: str = "claude-3-sonnet-20240229", **kwargs):
         super().__init__(model_name, **kwargs)
+        from anthropic import Anthropic
+
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        
+
         # Pricing per 1M tokens
         self.pricing = {
             "claude-3-opus-20240229": {"input": 15.0, "output": 75.0},
             "claude-3-sonnet-20240229": {"input": 3.0, "output": 15.0},
             "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
         }
-    
+
     def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompt: str, max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> LLMResponse:
         """Generate response using Anthropic API."""
         import time
+
         start = time.time()
-        
+
         message = self.client.messages.create(
             model=self.model_name,
             max_tokens=max_tokens,
             temperature=temperature,
             messages=[{"role": "user", "content": prompt}],
-            **kwargs
+            **kwargs,
         )
-        
+
         latency_ms = (time.time() - start) * 1000
-        
+
         # Calculate cost
         input_tokens = message.usage.input_tokens
         output_tokens = message.usage.output_tokens
         cost = self._calculate_cost(input_tokens, output_tokens)
-        
+
         return LLMResponse(
             text=message.content[0].text,
             model=self.model_name,
@@ -189,20 +179,16 @@ class AnthropicClient(BaseLLMClient):
             metadata={
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
-                "stop_reason": message.stop_reason
-            }
+                "stop_reason": message.stop_reason,
+            },
         )
-    
+
     def batch_generate(
-        self,
-        prompts: List[str],
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompts: List[str], max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> List[LLMResponse]:
         """Generate responses for multiple prompts."""
         return [self.generate(p, max_tokens, temperature, **kwargs) for p in prompts]
-    
+
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate cost in USD."""
         pricing = self.pricing.get(self.model_name, {"input": 0, "output": 0})
@@ -213,49 +199,52 @@ class AnthropicClient(BaseLLMClient):
 
 class HuggingFaceClient(BaseLLMClient):
     """Local Hugging Face model client (Llama, Mistral, etc.)."""
-    
+
     def __init__(self, model_name: str = "mistralai/Mistral-7B-Instruct-v0.2", **kwargs):
         super().__init__(model_name, **kwargs)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = "cpu"
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        torch.set_num_threads(8)
-        
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        if self.device == "cpu":
+            torch.set_num_threads(kwargs.get("num_threads", 8))
+
         # Load model and tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            #dtype=torch.float16 if self.device == "cuda" else torch.float32,
+            # dtype=torch.float16 if self.device == "cuda" else torch.float32,
             dtype=torch.float16 if self.device == "cuda" else torch.float32,
-            device_map="auto" if self.device == "cuda" else None
+            device_map="auto" if self.device == "cuda" else None,
         )
-        
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.model.eval()
-    
+
     def generate(
-        self,
-        prompt: str,
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompt: str, max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> LLMResponse:
         """Generate response using local Hugging Face model."""
         import time
+
+        import torch
+
         start = time.time()
-        
+
         # Tokenize input
-        inputs = self.tokenizer(prompt, 
-                                return_tensors="pt",
-                                 padding=True,
-                                 truncation=True,  # Évite les prompts trop longs
-                                 max_length=512     # Limite la longueur d'entrée
-                                 )
+        inputs = self.tokenizer(
+            prompt,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,  # Évite les prompts trop longs
+            max_length=512,  # Limite la longueur d'entrée
+        )
         if self.device == "cuda":
             inputs = {k: v.cuda() for k, v in inputs.items()}
-        
+
         # Generate
         with torch.no_grad():
             outputs = self.model.generate(
@@ -264,33 +253,28 @@ class HuggingFaceClient(BaseLLMClient):
                 temperature=temperature if temperature > 0 else 1.0,
                 do_sample=temperature > 0,
                 pad_token_id=self.tokenizer.pad_token_id,
-                **kwargs
+                **kwargs,
             )
-        
+
         # Decode
         generated_text = self.tokenizer.decode(
-            outputs[0][inputs["input_ids"].shape[1]:],
-            skip_special_tokens=True
+            outputs[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
         )
-        
+
         latency_ms = (time.time() - start) * 1000
         tokens_used = outputs.shape[1]
-        
+
         return LLMResponse(
             text=generated_text,
             model=self.model_name,
             tokens_used=tokens_used,
             latency_ms=latency_ms,
             cost_usd=0.0,  # Local inference is free
-            metadata={"device": self.device}
+            metadata={"device": self.device},
         )
-    
+
     def batch_generate(
-        self,
-        prompts: List[str],
-        max_tokens: int = 500,
-        temperature: float = 0.0,
-        **kwargs
+        self, prompts: List[str], max_tokens: int = 500, temperature: float = 0.0, **kwargs
     ) -> List[LLMResponse]:
         """Generate responses for multiple prompts."""
         # For simplicity, process sequentially
@@ -300,7 +284,7 @@ class HuggingFaceClient(BaseLLMClient):
 
 def get_llm_client(model_name: str, **kwargs) -> BaseLLMClient:
     """Factory function to get appropriate LLM client."""
-    
+
     if model_name.startswith("gpt-"):
         return OpenAIClient(model_name, **kwargs)
     elif model_name.startswith("claude-"):

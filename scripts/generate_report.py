@@ -7,18 +7,21 @@ Usage: python scripts/generate_report.py --input results/ --output report.html
 import argparse
 import json
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
 
 # Simple console replacement for rich
 class SimpleConsole:
     def print(self, text):
         # Remove rich formatting tags
         import re
-        clean_text = re.sub(r'\[.*?\]', '', text)
+
+        clean_text = re.sub(r"\[.*?\]", "", text)
         print(clean_text)
+
 
 console = SimpleConsole()
 
@@ -159,12 +162,12 @@ def load_results_from_dir(results_dir: Path):
     """Load all JSON result files from directory."""
     diagnostic_results = []
     improvement_results = []
-    
+
     for json_file in results_dir.glob("**/*.json"):
         try:
-            with open(json_file, 'r') as f:
+            with open(json_file, "r") as f:
                 data = json.load(f)
-            
+
             # Determine if diagnostic or improvement
             if "test_name" in data:
                 diagnostic_results.append(data)
@@ -172,19 +175,19 @@ def load_results_from_dir(results_dir: Path):
                 improvement_results.append(data)
         except Exception as e:
             console.print(f"[yellow]Warning: Could not load {json_file}: {e}[/yellow]")
-    
+
     return diagnostic_results, improvement_results
 
 
 def generate_diagnostic_sections(diagnostic_results):
     """Generate HTML sections for diagnostic results."""
     sections = []
-    
+
     for result in diagnostic_results:
         test_name = result.get("test_name", "Unknown Test")
         agg = result.get("aggregated_results", {})
         insights = result.get("diagnostic_insights", {})
-        
+
         # Build recommendations HTML
         recs = insights.get("recommendations", [])
         recs_html = ""
@@ -193,11 +196,13 @@ def generate_diagnostic_sections(diagnostic_results):
             for rec in recs[:3]:  # Top 3
                 recs_html += f"<li>{rec}</li>"
             recs_html += "</ul>"
-        
+
         # Success rate styling
         success_rate = agg.get("success_rate", 0)
-        success_class = "success" if success_rate > 0.8 else ("warning" if success_rate > 0.5 else "error")
-        
+        success_class = (
+            "success" if success_rate > 0.8 else ("warning" if success_rate > 0.5 else "error")
+        )
+
         section = f"""
         <div class="section">
             <h2>🧪 {test_name}</h2>
@@ -226,7 +231,7 @@ def generate_diagnostic_sections(diagnostic_results):
         </div>
         """
         sections.append(section)
-    
+
     return "\n".join(sections)
 
 
@@ -234,12 +239,12 @@ def generate_improvement_sections(improvement_results):
     """Generate HTML sections for improvement results."""
     if not improvement_results:
         return ""
-    
+
     sections = ["<div class='section'><h2>🚀 Improvement Strategies</h2>"]
-    
+
     for result in improvement_results:
         strategy_name = result.get("strategy_name", "Unknown Strategy")
-        
+
         # Format 1: Avec "results" array (format wrapper)
         results_list = result.get("results", [])
         if results_list:
@@ -250,51 +255,53 @@ def generate_improvement_sections(improvement_results):
         else:
             # Skip si pas de données
             continue
-        
-        config = first_result.get("config", {})
-        
-        # Gérer différentes structures de metrics
+
+        # Handle the various metrics structures produced by older runs
         baseline_metrics = first_result.get("baseline_metrics", {})
         improved_metrics = first_result.get("improved_metrics", {})
-        
+
         # Les metrics peuvent être directement dans baseline_metrics ou dans .metrics
         if isinstance(baseline_metrics, dict) and "metrics" in baseline_metrics:
             baseline = baseline_metrics.get("metrics", {})
         else:
             baseline = baseline_metrics
-            
+
         if isinstance(improved_metrics, dict) and "metrics" in improved_metrics:
             improved = improved_metrics.get("metrics", {})
         else:
             improved = improved_metrics
-        
+
         delta = first_result.get("improvement_delta", {})
-        
+
         # Si pas de métriques, skip
         if not baseline and not improved:
             continue
-        
+
         # Build comparison table
-        table_html = "<table><tr><th>Metric</th><th>Baseline</th><th>Improved</th><th>Delta</th></tr>"
-        
+        table_html = (
+            "<table><tr><th>Metric</th><th>Baseline</th><th>Improved</th><th>Delta</th></tr>"
+        )
+
         # Combiner les clés des deux dicts
         all_metrics = set(baseline.keys()) | set(improved.keys())
-        
+
         for metric_name in sorted(all_metrics):
             b_val = baseline.get(metric_name, 0)
             i_val = improved.get(metric_name, 0)
             d_val = delta.get(metric_name, i_val - b_val)
-            
+
             delta_class = "success" if d_val > 0 else "error" if d_val < 0 else ""
             delta_str = f"+{d_val:.3f}" if d_val >= 0 else f"{d_val:.3f}"
-            
+
             table_html += f"<tr><td>{metric_name.capitalize()}</td><td>{b_val:.3f}</td><td>{i_val:.3f}</td><td class='{delta_class}'>{delta_str}</td></tr>"
-        
+
         table_html += "</table>"
-        
+
         # Calcul de l'amélioration d'accuracy
-        accuracy_improvement = delta.get('accuracy', improved.get('accuracy', 0) - baseline.get('accuracy', 0)) * 100
-        
+        accuracy_improvement = (
+            delta.get("accuracy", improved.get("accuracy", 0) - baseline.get("accuracy", 0)) * 100
+        )
+
         section = f"""
         <h3>📈 {strategy_name}</h3>
         <p><em>{result.get('description', '')}</em></p>
@@ -315,7 +322,7 @@ def generate_improvement_sections(improvement_results):
         {table_html}
         """
         sections.append(section)
-    
+
     sections.append("</div>")
     return "\n".join(sections)
     return "\n".join(sections)
@@ -325,9 +332,11 @@ def generate_plotly_scripts(diagnostic_results, improvement_results):
     """Generate Plotly visualization scripts."""
     # Extract data for charts
     test_names = [r.get("test_name", "Unknown") for r in diagnostic_results]
-    success_rates = [r.get("aggregated_results", {}).get("success_rate", 0) * 100 for r in diagnostic_results]
+    success_rates = [
+        r.get("aggregated_results", {}).get("success_rate", 0) * 100 for r in diagnostic_results
+    ]
     costs = [r.get("aggregated_results", {}).get("total_cost_usd", 0) for r in diagnostic_results]
-    
+
     scripts = f"""
     // Success Rate Chart
     var successData = [{{
@@ -361,92 +370,90 @@ def generate_plotly_scripts(diagnostic_results, improvement_results):
     
     Plotly.newPlot('cost-comparison-chart', costData, costLayout);
     """
-    
+
     return scripts
 
 
 def generate_recommendations_html(diagnostic_results):
     """Generate key recommendations HTML."""
     all_recs = []
-    
+
     for result in diagnostic_results:
         insights = result.get("diagnostic_insights", {})
         recs = insights.get("recommendations", [])
         all_recs.extend(recs)
-    
+
     if not all_recs:
         return "<p>No recommendations at this time. Model performs well!</p>"
-    
+
     html = ""
     for i, rec in enumerate(all_recs[:5], 1):  # Top 5
         html += f'<div class="recommendation"><strong>{i}.</strong> {rec}</div>'
-    
+
     return html
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate HTML report from results")
-    
+
     parser.add_argument(
-        "--input",
-        type=str,
-        required=True,
-        help="Input directory containing JSON result files"
+        "--input", type=str, required=True, help="Input directory containing JSON result files"
     )
-    
+
     parser.add_argument(
         "--output",
         type=str,
         default="./report.html",
-        help="Output HTML file path (default: ./report.html)"
+        help="Output HTML file path (default: ./report.html)",
     )
-    
+
     parser.add_argument(
         "--improvements",
         type=str,
         default=None,
-        help="Directory containing improvement results (optional)"
+        help="Directory containing improvement results (optional)",
     )
-    
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="Unknown Model",
-        help="Model name for report"
-    )
-    
+
+    parser.add_argument("--model", type=str, default="Unknown Model", help="Model name for report")
+
     args = parser.parse_args()
-    
+
     console.print("[bold cyan]Generating LLM Diagnostic Report...[/bold cyan]")
-    
+
     # Load results
     results_dir = Path(args.input)
     if not results_dir.exists():
         console.print(f"[bold red]Error: {results_dir} does not exist[/bold red]")
         sys.exit(1)
-    
+
     # Load diagnostics from input directory
     diagnostic_results, _ = load_results_from_dir(results_dir)
-    
+
     # Load improvements from separate directory if specified
     improvement_results = []
     if args.improvements:
         improvements_dir = Path(args.improvements)
         if improvements_dir.exists():
             _, improvement_results = load_results_from_dir(improvements_dir)
-            console.print(f"[green]Found {len(improvement_results)} improvement results from {improvements_dir}[/green]")
+            console.print(
+                f"[green]Found {len(improvement_results)} improvement results from {improvements_dir}[/green]"
+            )
         else:
-            console.print(f"[yellow]Warning: Improvements directory {improvements_dir} does not exist[/yellow]")
+            console.print(
+                f"[yellow]Warning: Improvements directory {improvements_dir} does not exist[/yellow]"
+            )
     else:
         # Try to find improvements in subdirectory of input
         improvements_dir = results_dir / "improvements"
         if improvements_dir.exists():
             _, improvement_results = load_results_from_dir(improvements_dir)
-            console.print(f"[green]Found {len(improvement_results)} improvement results from {improvements_dir}[/green]")
-    
+            console.print(
+                f"[green]Found {len(improvement_results)} improvement results from {improvements_dir}[/green]"
+            )
+
     console.print(f"[green]Found {len(diagnostic_results)} diagnostic results[/green]")
     console.print(f"[green]Total improvements loaded: {len(improvement_results)}[/green]")
-    
+
     # DEBUG: Afficher la structure du premier improvement
     if improvement_results:
         console.print("\n[yellow]DEBUG: First improvement structure:[/yellow]")
@@ -457,30 +464,33 @@ def main():
         console.print(f"  Has 'config' key: {'config' in first}")
         console.print(f"  Top-level keys: {list(first.keys())[:10]}")
         console.print("")
-    
+
     if not diagnostic_results:
         console.print("[yellow]Warning: No diagnostic results found[/yellow]")
-    
+
     # Calculate summary metrics
     total_tests = len(diagnostic_results)
-    overall_success = sum(
-        r.get("aggregated_results", {}).get("success_rate", 0)
-        for r in diagnostic_results
-    ) / total_tests if total_tests > 0 else 0
-    
-    total_cost = sum(
-        r.get("aggregated_results", {}).get("total_cost_usd", 0)
-        for r in diagnostic_results
+    overall_success = (
+        sum(r.get("aggregated_results", {}).get("success_rate", 0) for r in diagnostic_results)
+        / total_tests
+        if total_tests > 0
+        else 0
     )
-    
-    success_class = "success" if overall_success > 0.8 else ("warning" if overall_success > 0.5 else "error")
-    
+
+    total_cost = sum(
+        r.get("aggregated_results", {}).get("total_cost_usd", 0) for r in diagnostic_results
+    )
+
+    success_class = (
+        "success" if overall_success > 0.8 else ("warning" if overall_success > 0.5 else "error")
+    )
+
     # Generate HTML sections
     diagnostic_sections = generate_diagnostic_sections(diagnostic_results)
     improvement_sections = generate_improvement_sections(improvement_results)
     plotly_scripts = generate_plotly_scripts(diagnostic_results, improvement_results)
     recommendations_html = generate_recommendations_html(diagnostic_results)
-    
+
     # Fill template
     html_content = HTML_TEMPLATE.format(
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -492,14 +502,14 @@ def main():
         diagnostic_sections=diagnostic_sections,
         improvement_sections=improvement_sections,
         plotly_scripts=plotly_scripts,
-        recommendations_html=recommendations_html
+        recommendations_html=recommendations_html,
     )
-    
+
     # Write to file
     output_path = Path(args.output)
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(html_content)
-    
+
     console.print(f"[bold green]✓ Report generated: {output_path}[/bold green]")
     console.print(f"[cyan]Open {output_path} in your browser to view[/cyan]")
 
