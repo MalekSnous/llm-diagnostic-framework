@@ -2,10 +2,13 @@
 Module pour sauvegarder et générer des rapports pour les case studies.
 """
 
+import html as _html
 import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+
+from . import report_theme
 
 
 class CaseStudyReporter:
@@ -122,7 +125,7 @@ class CaseStudyReporter:
         improvements: Dict[str, Any],
         test_cases: List[Dict[str, Any]] = None,
     ) -> str:
-        """Construit le HTML du rapport."""
+        """Construit le HTML du rapport (design system partagé, clair/sombre)."""
 
         baseline_acc = baseline.get("accuracy", 0)
         baseline_cost = baseline.get("cost", 0)
@@ -131,10 +134,10 @@ class CaseStudyReporter:
         results_rows = f"""
             <tr>
                 <td><strong>Baseline (Zero-shot)</strong></td>
-                <td>{baseline_acc:.1%}</td>
-                <td>-</td>
-                <td>${baseline_cost:.4f}</td>
-                <td>-</td>
+                <td class="num">{baseline_acc:.1%}</td>
+                <td class="num">-</td>
+                <td class="num">${baseline_cost:.4f}</td>
+                <td class="num">-</td>
             </tr>
         """
 
@@ -146,11 +149,11 @@ class CaseStudyReporter:
 
             results_rows += f"""
             <tr>
-                <td><strong>{strategy_name}</strong></td>
-                <td>{acc:.1%}</td>
-                <td class="{"positive" if improvement > 0 else "negative"}">{improvement:+.1f}%</td>
-                <td>${cost:.4f}</td>
-                <td>${cost_per_point:.2f}</td>
+                <td><strong>{_html.escape(strategy_name)}</strong></td>
+                <td class="num">{acc:.1%}</td>
+                <td class="num {"pos" if improvement > 0 else "neg"}">{improvement:+.1f}%</td>
+                <td class="num">${cost:.4f}</td>
+                <td class="num">${cost_per_point:.2f}</td>
             </tr>
             """
 
@@ -159,27 +162,28 @@ class CaseStudyReporter:
         if test_cases:
             test_cases_rows = ""
             for i, tc in enumerate(test_cases):
+                ok = tc.get("success", False)
                 test_cases_rows += f"""
                 <tr>
-                    <td>{i+1}</td>
-                    <td class="test-input">{tc.get('input', 'N/A')[:100]}...</td>
-                    <td class="test-output">{tc.get('expected', 'N/A')}</td>
-                    <td class="{"success" if tc.get('success', False) else "failure"}">
-                        {tc.get('baseline_prediction', 'N/A')[:50]}...
+                    <td class="num">{i+1}</td>
+                    <td><code>{_html.escape(str(tc.get('input', 'N/A'))[:100])}...</code></td>
+                    <td><code>{_html.escape(str(tc.get('expected', 'N/A')))}</code></td>
+                    <td class="{"pos" if ok else "neg"}">
+                        {_html.escape(str(tc.get('baseline_prediction', 'N/A'))[:50])}...
                     </td>
                 </tr>
                 """
 
             test_cases_section = f"""
-            <div class="section">
-                <h2>📋 Test Cases Details</h2>
+            <h2>📋 Test cases details</h2>
+            <div class="tablewrap">
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th class="num">ID</th>
                             <th>Input</th>
                             <th>Expected</th>
-                            <th>Baseline Prediction</th>
+                            <th>Baseline prediction</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -189,251 +193,104 @@ class CaseStudyReporter:
             </div>
             """
 
-        html = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{self.study_name} - Case Study Report</title>
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-        }}
-        
-        .container {{
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }}
-        
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-        }}
-        
-        .header h1 {{
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }}
-        
-        .header .subtitle {{
-            font-size: 1.2em;
-            opacity: 0.9;
-        }}
-        
-        .metadata {{
-            background: #f8f9fa;
-            padding: 20px 40px;
-            border-bottom: 2px solid #e9ecef;
-        }}
-        
-        .metadata-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }}
-        
-        .metadata-item {{
-            display: flex;
-            flex-direction: column;
-        }}
-        
-        .metadata-label {{
-            font-size: 0.9em;
-            color: #6c757d;
-            margin-bottom: 5px;
-        }}
-        
-        .metadata-value {{
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #495057;
-        }}
-        
-        .content {{
-            padding: 40px;
-        }}
-        
-        .section {{
-            margin-bottom: 40px;
-        }}
-        
-        .section h2 {{
-            color: #667eea;
-            font-size: 1.8em;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #667eea;
-        }}
-        
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        
-        thead {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }}
-        
-        th {{
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-        }}
-        
-        td {{
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
-        }}
-        
-        tbody tr:hover {{
-            background-color: #f8f9fa;
-        }}
-        
-        .positive {{
-            color: #28a745;
-            font-weight: 600;
-        }}
-        
-        .negative {{
-            color: #dc3545;
-            font-weight: 600;
-        }}
-        
-        .success {{
-            background-color: #d4edda;
-        }}
-        
-        .failure {{
-            background-color: #f8d7da;
-        }}
-        
-        .test-input, .test-output {{
-            font-size: 0.9em;
-            font-family: 'Courier New', monospace;
-            background: #f8f9fa;
-            padding: 5px;
-            border-radius: 3px;
-        }}
-        
-        .recommendation {{
-            background: #e7f3ff;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            margin-top: 30px;
-            border-radius: 5px;
-        }}
-        
-        .recommendation h3 {{
-            color: #667eea;
-            margin-bottom: 10px;
-        }}
-        
-        .chart-container {{
-            margin: 30px 0;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 5px;
-        }}
-        
-        .footer {{
-            background: #f8f9fa;
-            padding: 20px 40px;
-            text-align: center;
-            color: #6c757d;
-            font-size: 0.9em;
-            border-top: 2px solid #e9ecef;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>📊 {self.study_name}</h1>
-            <p class="subtitle">Case Study Report</p>
-        </div>
-        
-        <div class="metadata">
-            <div class="metadata-grid">
-                <div class="metadata-item">
-                    <span class="metadata-label">Model</span>
-                    <span class="metadata-value">{model_name}</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-label">Date</span>
-                    <span class="metadata-value">{datetime.now().strftime("%Y-%m-%d %H:%M")}</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-label">Baseline Accuracy</span>
-                    <span class="metadata-value">{baseline_acc:.1%}</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-label">Best Improvement</span>
-                    <span class="metadata-value positive">
-                        {max([r.get('accuracy', 0) - baseline_acc for r in improvements.values()]) * 100:+.1f}%
-                    </span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="content">
-            <div class="section">
-                <h2>📈 Results Summary</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Strategy</th>
-                            <th>Accuracy</th>
-                            <th>Improvement</th>
-                            <th>Cost</th>
-                            <th>Cost per Point</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {results_rows}
-                    </tbody>
-                </table>
-            </div>
-            
-            {test_cases_section}
-            
-            <div class="recommendation">
+        # Métadonnées, graphique et recommandation
+        try:
+            run_date = datetime.strptime(self.timestamp, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            run_date = self.timestamp
+
+        best_delta = (
+            max(r.get("accuracy", 0) - baseline_acc for r in improvements.values())
+            if improvements
+            else 0.0
+        )
+        tiles = report_theme.stat_tile("Model", _html.escape(model_name), f"run {run_date}")
+        tiles += report_theme.stat_tile("Baseline accuracy", f"{baseline_acc:.1%}", "zero-shot")
+        tiles += report_theme.stat_tile(
+            "Best improvement",
+            f"{best_delta * 100:+.1f} pts",
+            "vs baseline",
+            delta_good=best_delta >= 0,
+        )
+        tiles += report_theme.stat_tile("Baseline cost", f"${baseline_cost:.4f}", "full run")
+
+        bar_rows = [("Baseline (zero-shot)", baseline_acc)] + [
+            (name, r.get("accuracy", 0)) for name, r in improvements.items()
+        ]
+        chart = report_theme.chart_figure(
+            "Accuracy by strategy",
+            "Same test set, same model — only the strategy changes.",
+            [],
+            report_theme.svg_strategy_bars(bar_rows),
+        )
+
+        recommendation = ""
+        if improvements:
+            best_name, best_res = max(improvements.items(), key=lambda x: x[1].get("accuracy", 0))
+            recommendation = f"""
+            <div class="callout">
                 <h3>✅ Recommendation</h3>
                 <p>
-                    Based on the results, <strong>{max(improvements.items(), key=lambda x: x[1].get('accuracy', 0))[0]}</strong> 
-                    achieves the best performance with 
-                    {max([r.get('accuracy', 0) for r in improvements.values()]):.1%} accuracy 
-                    ({max([r.get('accuracy', 0) - baseline_acc for r in improvements.values()]) * 100:+.1f}% improvement).
+                    Based on the results, <strong>{_html.escape(best_name)}</strong>
+                    achieves the best performance with
+                    {best_res.get('accuracy', 0):.1%} accuracy
+                    ({best_delta * 100:+.1f} pts vs baseline).
                 </p>
             </div>
+            """
+
+        title = self.study_name.replace("_", " ").title()
+        head = report_theme.page_head(
+            f"{title} — {model_name} — Case Study Report",
+            f"Baseline vs improvement strategies for {model_name}: accuracy and real token cost.",
+        )
+
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+{head}
+</head>
+<body>
+    <div class="wrap">
+        <a class="crumb" href="index.html">&larr; LLM Diagnostic Framework</a>
+        <h1>📊 {_html.escape(title)}</h1>
+        <p class="lead">Case study report — <strong>{_html.escape(model_name)}</strong>,
+        baseline vs improvement strategies, scored on the same test set with real token cost.</p>
+
+        <div class="tiles">{tiles}</div>
+
+        {chart}
+
+        <h2>📈 Results summary</h2>
+        <div class="tablewrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th class="num">Accuracy</th>
+                        <th class="num">Improvement</th>
+                        <th class="num">Cost</th>
+                        <th class="num">Cost per point</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {results_rows}
+                </tbody>
+            </table>
         </div>
-        
-        <div class="footer">
-            <p>Generated by LLM Diagnostic Framework | {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
-        </div>
+
+        {test_cases_section}
+
+        {recommendation}
+
+        <footer>Generated by
+            <a href="https://github.com/MalekSnous/llm-diagnostic-framework">LLM Diagnostic
+            Framework</a> · run {run_date} · <a href="index.html">Back to overview</a>
+        </footer>
     </div>
 </body>
 </html>
-        """
+"""
 
         return html
 

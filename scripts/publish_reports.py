@@ -52,11 +52,25 @@ def _title(key: str) -> str:
     return key.replace("_", " ").replace("microsoft/", "").replace("/", " ").strip().title()
 
 
-def _card(title: str, filename: str) -> str:
-    t = html.escape(title)
+def _provider(key: str) -> str:
+    """Badge provider dérivé du nom du run (heuristique)."""
+    k = key.lower()
+    if "claude" in k or "anthropic" in k:
+        return "Anthropic"
+    if "gpt" in k or "o1" in k or "o3" in k:
+        return "OpenAI"
+    if "groq" in k or "llama" in k or "mixtral" in k:
+        return "Groq"
+    return "Model"
+
+
+def _card(key: str, filename: str) -> str:
+    t = html.escape(_title(key))
     f = html.escape(filename)
+    provider = html.escape(_provider(key))
     return (
         '      <div class="card">'
+        f'<span class="tag">{provider}</span>'
         f"<h3>{t}</h3>"
         "<p>Baseline vs strategies — F1 and real token cost.</p>"
         f'<a href="{f}">Open report &rarr;</a></div>'
@@ -69,7 +83,7 @@ def _empty_block() -> str:
         "<code>make publish model=gpt-4o-mini</code> to generate trustworthy ones with the "
         "fixed scoring and pricing.</p>\n"
         '    <div class="btns" style="justify-content:flex-start;">\n'
-        '      <a class="btn primary" style="color:#5b3fb9;background:#e6edf3;border-color:#e6edf3;" '
+        '      <a class="btn primary" '
         'href="https://github.com/MalekSnous/llm-diagnostic-framework#-case-studies">'
         "How to run the studies &rarr;</a>\n    </div>"
     )
@@ -87,7 +101,7 @@ def main() -> None:
         src = reports[key]
         dest = DOCS / src.name
         shutil.copy2(src, dest)
-        cards.append(_card(_title(key), src.name))
+        cards.append(_card(key, src.name))
         print(f"published {src.name}")
 
     inner = "\n".join(cards)

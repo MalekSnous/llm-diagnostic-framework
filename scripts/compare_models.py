@@ -26,6 +26,8 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
+from llm_diagnostic.utils import report_theme
+
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results" / "case_studies"
 DOCS = ROOT / "docs"
@@ -185,68 +187,131 @@ def render_markdown(data_by_model: dict[str, dict]) -> str:
 
 
 def render_html(data_by_model: dict[str, dict]) -> str:
-    grows = ""
+    # (model, baseline_f1, pe_f1, best_f1, cost) — même dérivation que _findings
+    rows = []
     for model in sorted(data_by_model):
         d = data_by_model[model]
         base = d["baseline"]["accuracy"]
-        name, imp = _best_improvement(d)
+        _, imp = _best_improvement(d)
         pe = imp.get("accuracy", base)
         cost = imp.get("cost", d["baseline"].get("cost", 0))
+        rows.append((model, base, pe, max(base, pe), cost))
+
+    # Stat tiles
+    tiles = ""
+    if rows:
+        top = max(rows, key=lambda r: r[3])
+        mg = max(rows, key=lambda r: r[2] - r[1])
+        tiles = report_theme.stat_tile("Models compared", str(len(rows)), "same 97-case harness")
+        tiles += report_theme.stat_tile("Best F1", f"{top[3]:.1%}", html.escape(top[0]))
+        tiles += report_theme.stat_tile(
+            "Biggest prompt-eng gain",
+            f"{(mg[2] - mg[1]) * 100:+.1f} pts",
+            html.escape(mg[0]),
+            delta_good=(mg[2] - mg[1]) >= 0,
+        )
+        paid = [r for r in rows if r[4] > 0]
+        if paid:
+            value = max(paid, key=lambda r: r[3] / r[4])
+            tiles += report_theme.stat_tile(
+                "Best value (F1 per $)",
+                html.escape(value[0]),
+                f"F1 {value[3]:.1%} for ${value[4]:.4f}",
+            )
+    tiles_html = f'<div class="tiles">{tiles}</div>' if tiles else ""
+
+    # Graphiques
+    bars = report_theme.chart_figure(
+        "F1 by model — baseline vs prompt engineering",
+        "Entity-extraction F1 on the same dataset; longer is better.",
+        [("Baseline (zero-shot)", "var(--s1)"), ("+Prompt engineering (few-shot)", "var(--s2)")],
+        report_theme.svg_grouped_bars([(m, b, p) for m, b, p, _, _ in rows]),
+    )
+    scatter_svg = report_theme.svg_cost_quality_scatter([(m, c, best) for m, _, _, best, c in rows])
+    scatter = (
+        report_theme.chart_figure(
+            "Cost vs quality",
+            "Best F1 per model against its run cost — up and to the left wins.",
+            [],
+            scatter_svg,
+        )
+        if scatter_svg
+        else ""
+    )
+
+    # Tableau global
+    trows = ""
+    for model, base, pe, _, cost in rows:
         delta = (pe - base) * 100
         cls = "pos" if delta >= 0 else "neg"
-        grows += (
-            f"<tr><td>{html.escape(model)}</td><td>{base:.1%}</td>"
-            f"<td>{pe:.1%}</td><td class='{cls}'>{delta:+.1f}</td><td>${cost:.4f}</td></tr>\n"
+        trows += (
+            f"<tr><td>{html.escape(model)}</td><td class='num'>{base:.1%}</td>"
+            f"<td class='num'>{pe:.1%}</td><td class='num {cls}'>{delta:+.1f}</td>"
+            f"<td class='num'>${cost:.4f}</td></tr>\n"
         )
+    table_html = f"""<div class="tablewrap"><table>
+<thead><tr><th>Model</th><th class="num">Baseline F1</th><th class="num">+Prompt Eng</th>
+<th class="num">Δ (pts)</th><th class="num">Cost (USD)</th></tr></thead>
+<tbody>
+{trows}</tbody></table></div>"""
 
     diff = _difficulty_rows(data_by_model)
-    diff_html = ""
     if diff:
-        head = "".join(f"<th>{t}</th>" for t in TIERS)
+        head = '<th class="num">' + '</th><th class="num">'.join(TIERS) + "</th>"
         body = ""
         for model, by in diff:
-            cells = "".join(f"<td>{by[t]:.0%}</td>" if t in by else "<td>—</td>" for t in TIERS)
+            cells = "".join(
+                f"<td class='num'>{by[t]:.0%}</td>" if t in by else "<td class='num'>—</td>"
+                for t in TIERS
+            )
             body += f"<tr><td>{html.escape(model)}</td>{cells}</tr>\n"
         diff_html = f"""
 <h2>Baseline F1 by difficulty</h2>
-<p>Where each model breaks down as notes get denser (explicit → clinical shorthand).</p>
-<table><thead><tr><th>Model</th>{head}</tr></thead><tbody>
-{body}</tbody></table>"""
+<p class="lead">Where each model breaks down as notes get denser (explicit → clinical shorthand).</p>
+<div class="tablewrap"><table><thead><tr><th>Model</th>{head}</tr></thead><tbody>
+{body}</tbody></table></div>"""
     else:
         diff_html = (
-            "<h2>Baseline F1 by difficulty</h2><p><em>No per-difficulty data in these runs — "
-            "re-run the studies (the saver now captures it) to populate this table.</em></p>"
+            '<h2>Baseline F1 by difficulty</h2><p class="lead"><em>No per-difficulty data in '
+            "these runs — re-run the studies (the saver now captures it) to populate this "
+            "table.</em></p>"
         )
 
     findings = _findings(data_by_model)
     findings_html = ""
     if findings:
-        items = "".join(f"<li>{html.escape(f).replace('**','')}</li>" for f in findings)
-        findings_html = f"<h2>Findings</h2><ul>{items}</ul>"
+        items = ""
+        for f in findings:
+            parts = html.escape(f).split("**")
+            styled = "".join(f"<strong>{p}</strong>" if i % 2 else p for i, p in enumerate(parts))
+            items += f"<li>{styled}</li>"
+        findings_html = f'<h2>Findings</h2><ul class="findings">{items}</ul>'
 
+    head_html = report_theme.page_head(
+        "Model comparison — medical entity extraction",
+        "Cross-model benchmark: entity-extraction F1 vs real token cost, "
+        "baseline vs prompt engineering.",
+    )
     return f"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Model comparison — medical entity extraction</title>
-<style>
- body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0d1117;color:#e6edf3;max-width:860px;margin:40px auto;padding:0 20px;line-height:1.6}}
- h1{{font-size:1.7rem}} h2{{font-size:1.25rem;margin-top:34px}} a{{color:#6e8efb}}
- table{{width:100%;border-collapse:collapse;background:#161b22;border-radius:10px;overflow:hidden;margin:12px 0}}
- th,td{{padding:10px 14px;text-align:right;border-bottom:1px solid #30363d}}
- th:first-child,td:first-child{{text-align:left}}
- th{{background:#1f2630}} .pos{{color:#3fb950}} .neg{{color:#f85149}}
- .lead{{color:#9da7b3}}
-</style></head><body>
+<html lang="en"><head>
+{head_html}
+</head><body>
+<div class="wrap">
+<a class="crumb" href="index.html">&larr; LLM Diagnostic Framework</a>
 <h1>📊 Model comparison — medical entity extraction</h1>
 <p class="lead">Same 97-case clinical dataset (easy → expert), one harness. Quality is
 entity-extraction <strong>F1</strong> (precision/recall, verbosity-robust); cost is real
 token cost. Baseline = zero-shot; +Prompt Eng = few-shot prompting.</p>
-<table><thead><tr><th>Model</th><th>Baseline F1</th><th>+Prompt Eng</th><th>Δ (pts)</th><th>Cost (USD)</th></tr></thead>
-<tbody>
-{grows}</tbody></table>
+{tiles_html}
+{bars}
+{scatter}
+<h2>Full results</h2>
+{table_html}
 {diff_html}
 {findings_html}
-<p style="margin-top:28px"><a href="index.html">&larr; Back to overview</a></p>
+<footer>Generated by <a href="https://github.com/MalekSnous/llm-diagnostic-framework">
+LLM Diagnostic Framework</a> · <a href="index.html">Back to overview</a></footer>
+</div>
 </body></html>
 """
 
