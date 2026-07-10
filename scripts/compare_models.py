@@ -305,7 +305,10 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
         f"{metric.capitalize()} by model — baseline vs {meta['imp_name'].lower()}",
         f"{metric.capitalize()} on the same dataset; longer is better.",
         [("Baseline", "var(--s1)"), (meta["imp_label"], "var(--s2)")],
-        report_theme.svg_grouped_bars([(m, b, p) for m, b, p, _, _ in rows]),
+        report_theme.svg_grouped_bars(
+            [(m, b, p) for m, b, p, _, _ in rows],
+            series=("Baseline", meta["imp_label"]),
+        ),
     )
     scatter_svg = report_theme.svg_cost_quality_scatter([(m, c, best) for m, _, _, best, c in rows])
     scatter = (
@@ -380,6 +383,7 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
 <a class="crumb" href="index.html">&larr; LLM Diagnostic Framework</a>
 <h1>📊 Model comparison — {html.escape(meta["title"])}</h1>
 <p class="lead">{meta["lead"]}</p>
+{report_theme.explainer_flow(study)}
 {tiles_html}
 {bars}
 {scatter}

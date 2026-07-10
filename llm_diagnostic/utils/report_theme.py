@@ -132,6 +132,50 @@ footer { padding: 34px 0 40px; color: var(--muted); font-size: .9rem;
          border-top: 1px solid var(--border); margin-top: 48px; }
 """
 
+# CSS des panneaux "explainer" — constante séparée pour pouvoir l'injecter aussi
+# dans docs/index.html (qui a sa propre feuille de style) via publish_reports.
+EXPLAINER_CSS = """
+/* Explainer panels: input → (LLM) → output, readable in 3 seconds */
+.explainer { display: flex; align-items: stretch; gap: 10px; margin: 18px 0 4px;
+             flex-wrap: nowrap; }
+.ex-stage { flex: 1 1 0; min-width: 0; background: var(--card);
+            border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.ex-stage .ex-label { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+                      letter-spacing: .06em; color: var(--accent); margin-bottom: 6px; }
+.ex-stage .ex-body { font-size: .86rem; line-height: 1.45; }
+.ex-stage.mono .ex-body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
+                          "Liberation Mono", monospace; font-size: .78rem;
+                          white-space: pre-wrap; overflow-wrap: anywhere;
+                          background: var(--card2); border-radius: 8px; padding: 9px 11px; }
+.ex-stage.good { border-color: color-mix(in srgb, var(--good) 55%, var(--border)); }
+.ex-stage.good .ex-label { color: var(--good); }
+.ex-arrow { display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 3px; flex: 0 0 auto; color: var(--faint);
+            padding: 0 2px; }
+.ex-arrow .ex-tag { font-size: .7rem; font-weight: 700; white-space: nowrap;
+                    padding: 2px 9px; border-radius: 999px; color: var(--accent);
+                    background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ex-arrow svg { width: 30px; height: 12px; display: block; }
+.ex-caption { font-size: .84rem; color: var(--muted); margin: 8px 0 18px; }
+@media (max-width: 720px) {
+  .explainer { flex-direction: column; }
+  .ex-arrow { flex-direction: row; padding: 2px 0; }
+  .ex-arrow svg { transform: rotate(90deg); width: 22px; }
+}
+/* Panel wrapper used on the landing page (title + link around a flow) */
+.ex-panel { background: var(--card); border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px 22px; margin: 18px 0; }
+.ex-panel h3 { margin: 0 0 4px; font-size: 1.08rem; }
+.ex-panel > p { color: var(--muted); margin: 0; font-size: .92rem; }
+.ex-panel .explainer { margin: 14px 0 4px; }
+.ex-panel .ex-stage { background: var(--card2); }
+.ex-panel .ex-stage.mono .ex-body { background: var(--bg); }
+.ex-panel .ex-links { font-size: .9rem; margin-top: 6px; }
+.ex-panel .ex-links a + a { margin-left: 18px; }
+"""
+
+THEME_CSS += EXPLAINER_CSS
+
 # --- Géométrie SVG -----------------------------------------------------------
 
 _W = 720  # largeur logique (viewBox) de tous les graphiques
@@ -189,10 +233,14 @@ def chart_figure(title: str, subtitle: str, legend: Sequence[Tuple[str, str]], s
     )
 
 
-def svg_grouped_bars(rows: Sequence[Tuple[str, float, float]]) -> str:
+def svg_grouped_bars(
+    rows: Sequence[Tuple[str, float, float]],
+    series: Tuple[str, str] = ("Baseline", "+Prompt Eng"),
+) -> str:
     """
     Barres horizontales groupées : pour chaque (label, v1, v2) avec des valeurs
     dans [0, 1], deux barres (série 1 puis série 2) avec labels de valeur au bout.
+    ``series`` nomme les deux séries dans les tooltips.
     """
     left, right, top, bottom = 8, 64, 6, 28
     bar_h, pair_gap, label_h, group_gap = 16, 2, 20, 18
@@ -220,8 +268,10 @@ def svg_grouped_bars(rows: Sequence[Tuple[str, float, float]]) -> str:
             f'<text x="{left}" y="{y + 12}" font-size="12.5" font-weight="600" '
             f'fill="var(--text)">{_esc(label)}</text>'
         )
-        for value, color, name in ((v1, "var(--s1)", "Baseline"), (v2, "var(--s2)", "+Prompt Eng")):
-            by = y + label_h if name == "Baseline" else y + label_h + bar_h + pair_gap
+        for idx, (value, color, name) in enumerate(
+            ((v1, "var(--s1)", series[0]), (v2, "var(--s2)", series[1]))
+        ):
+            by = y + label_h if idx == 0 else y + label_h + bar_h + pair_gap
             w = max(plot_w * max(0.0, min(1.0, value)), 2)
             parts.append(
                 f'<path d="{_bar_path(left, by, w, bar_h)}" fill="{color}">'
@@ -363,4 +413,164 @@ def svg_strategy_bars(rows: Sequence[Tuple[str, float]]) -> str:
     return (
         f'<svg viewBox="0 0 {_W} {height}" role="img" '
         f'aria-label="Bar chart">{"".join(parts)}</svg>'
+    )
+
+
+# --- Explainer panels ---------------------------------------------------------
+# Un exemple concret par étude — entrée → (LLM) → sortie — lisible en 3 secondes.
+# Une seule source de vérité : la landing page (via publish_reports) et les pages
+# de comparaison (via compare_models) rendent les mêmes panneaux.
+
+_GITHUB = "https://github.com/MalekSnous/llm-diagnostic-framework/tree/main/case_studies"
+
+
+def _stage(label: str, body: str, mono: bool = False, good: bool = False) -> dict:
+    return {"kind": "stage", "label": label, "body": body, "mono": mono, "good": good}
+
+
+def _arrow(label: str) -> dict:
+    return {"kind": "arrow", "label": label}
+
+
+STUDY_EXPLAINERS: dict = {
+    "medical_entity_extraction": {
+        "tag": "Entity extraction",
+        "title": "Medical Entity Extraction",
+        "blurb": "When generic RAG and few-shot prompting <em>degrade</em> an "
+        "already-strong model.",
+        "github": f"{_GITHUB}/medical_entity_extraction",
+        "flow": [
+            _stage(
+                "Clinical note",
+                "“Pt c/o chest pain radiating to L arm. Hx of HTN. "
+                "Started aspirin 81 mg daily.”",
+            ),
+            _arrow("LLM"),
+            _stage(
+                "Extracted entities",
+                '{"conditions": ["chest pain",\n'
+                '   "hypertension"],\n'
+                ' "medications": ["aspirin 81 mg"]}',
+                mono=True,
+            ),
+            _arrow("scored"),
+            _stage(
+                "F1 vs gold",
+                "precision & recall against\ngold annotations → F1",
+                mono=True,
+                good=True,
+            ),
+        ],
+        "caption": "Verbosity can't win: every extra made-up entity costs precision, "
+        "every missed one costs recall.",
+    },
+    "rag_document_qa": {
+        "tag": "RAG · Document QA",
+        "title": "Document QA with RAG",
+        "blurb": "The opposite case: questions about a private knowledge base the model "
+        "was never trained on — retrieval is what unlocks accuracy.",
+        "github": f"{_GITHUB}/rag_document_qa",
+        "flow": [
+            _stage(
+                "Question",
+                "“How much is each additional ACU billed at on the Growth plan?”",
+            ),
+            _arrow("retrieve"),
+            _stage(
+                "Retrieved chunk",
+                "[source: plans_and_billing]\n…The Growth plan includes 500 free "
+                "ACUs per month, with additional ACUs billed at $0.08 each…",
+                mono=True,
+            ),
+            _arrow("LLM"),
+            _stage(
+                "Grounded answer",
+                "“$0.08 per additional ACU\n[plans_and_billing]”",
+                mono=True,
+                good=True,
+            ),
+        ],
+        "caption": "Closed-book, the model can only guess (the facts are private). The study "
+        "scores retrieval recall@k and answer accuracy separately — and unanswerable "
+        "questions must get “Not in the documentation”, not a hallucination.",
+    },
+    "text_to_sql": {
+        "tag": "Text-to-SQL",
+        "title": "Text-to-SQL with Execution",
+        "blurb": "The generated SQL is <em>executed</em> — a metric you can't game "
+        "with verbosity.",
+        "github": f"{_GITHUB}/text_to_sql",
+        "flow": [
+            _stage(
+                "Question",
+                "“List the names of customers who never placed an order.”",
+            ),
+            _arrow("LLM"),
+            _stage(
+                "Generated SQL",
+                "SELECT name FROM customers\nWHERE id NOT IN (\n"
+                "  SELECT customer_id\n  FROM orders);",
+                mono=True,
+            ),
+            _arrow("executed"),
+            _stage(
+                "Execution check",
+                "result rows == gold rows\n→ 1 point, else 0",
+                mono=True,
+                good=True,
+            ),
+        ],
+        "caption": "Both the model's query and the gold query run on the same seeded SQLite "
+        "database; only matching result sets score. Formatting, aliases and row order "
+        "don't matter — correctness does.",
+    },
+}
+
+_ARROW_SVG = (
+    '<svg viewBox="0 0 30 12" aria-hidden="true"><path d="M0 6 H22 M17 1 L24 6 L17 11" '
+    'stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" '
+    'stroke-linejoin="round"/></svg>'
+)
+
+
+def _render_flow(flow: Sequence[dict], caption: str) -> str:
+    parts: List[str] = []
+    for item in flow:
+        if item["kind"] == "arrow":
+            parts.append(
+                f'<div class="ex-arrow"><span class="ex-tag">{_esc(item["label"])}</span>'
+                f"{_ARROW_SVG}</div>"
+            )
+        else:
+            cls = "ex-stage" + (" mono" if item["mono"] else "") + (" good" if item["good"] else "")
+            parts.append(
+                f'<div class="{cls}"><div class="ex-label">{_esc(item["label"])}</div>'
+                f'<div class="ex-body">{_esc(item["body"])}</div></div>'
+            )
+    flow_html = f'<div class="explainer">{"".join(parts)}</div>'
+    caption_html = f'<p class="ex-caption">{_esc(caption)}</p>' if caption else ""
+    return flow_html + caption_html
+
+
+def explainer_flow(study: str) -> str:
+    """The bare input → LLM → output flow for one study ('' if unknown)."""
+    meta = STUDY_EXPLAINERS.get(study)
+    if not meta:
+        return ""
+    return _render_flow(meta["flow"], meta["caption"])
+
+
+def explainer_panel(study: str, comparison_href: Optional[str] = None) -> str:
+    """Landing-page panel: title + blurb + flow + links ('' if unknown study)."""
+    meta = STUDY_EXPLAINERS.get(study)
+    if not meta:
+        return ""
+    links = f'<a href="{_esc(meta["github"])}">See the study on GitHub &rarr;</a>'
+    if comparison_href:
+        links = f'<a href="{_esc(comparison_href)}">Open the model comparison &rarr;</a>' + links
+    return (
+        f'<div class="ex-panel"><span class="tag">{_esc(meta["tag"])}</span>'
+        f'<h3>{_esc(meta["title"])}</h3><p>{meta["blurb"]}</p>'
+        f'{_render_flow(meta["flow"], meta["caption"])}'
+        f'<div class="ex-links">{links}</div></div>'
     )
