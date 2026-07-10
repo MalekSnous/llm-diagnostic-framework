@@ -135,12 +135,20 @@ python case_studies/medical_entity_extraction/run_study.py --model microsoft/phi
 
 ### 2. Document QA with RAG — when retrieval *wins*
 
-Questions about a private document (`data/product_docs.txt`) the model was never
-trained on. Baseline (closed-book) must guess; RAG retrieves the answer.
+100 questions about a fictional internal platform whose facts exist only in a
+private multi-document knowledge base (`data/acmecloud_kb/`) — no model can know
+them from training. Three arms through a **full modular RAG pipeline**
+(`llm_diagnostic/rag/`: ingestion → chunking → embedding → vector search →
+reranking → answer): closed-book baseline, RAG, and RAG + cross-encoder
+reranking. Four difficulty tiers (verbatim lookups → cross-document reasoning),
+including **unanswerable questions** where the right behaviour is to abstain.
+Reports answer accuracy (digit-boundary matching, so "50" can't be satisfied by
+"500") *and* retrieval recall@k against gold source documents.
 
 ```bash
-pip install -e ".[rag]"
-python case_studies/rag_document_qa/run_study.py --model gpt-4o-mini
+python case_studies/rag_document_qa/run_study.py --model gpt-4o-mini            # TF-IDF fallback works offline
+pip install -e ".[rag]"                                                         # enables dense embeddings + reranking
+python case_studies/rag_document_qa/run_study.py --model gpt-4o-mini            # dense + rerank arms
 ```
 
 ### 3. Text-to-SQL — a metric you can't game
@@ -209,6 +217,34 @@ scored by entity-extraction **F1** (precision/recall, verbosity-robust) with
 > Snapshot of one run (June 2026, RAG excluded). Small sample (97 cases) and a
 > containment-based metric sensitive to output format — treat as a methodology
 > demonstration, not a leaderboard. Re-run to reproduce.
+
+## 📊 Latest Results (RAG Document QA)
+
+Same 100-question private-knowledge dataset, same harness: closed-book baseline
+vs the full RAG pipeline (dense retrieval + cross-encoder reranking).
+
+🔗 **Interactive version:** [maleksnous.github.io/llm-diagnostic-framework → RAG comparison](https://maleksnous.github.io/llm-diagnostic-framework/comparison_rag_document_qa.html)
+
+| Model | Baseline (closed-book) | +RAG (best arm) | Δ (pts) | Recall@4 | Cost (100 q) |
+|-------|-----------------------:|----------------:|--------:|---------:|-------------:|
+| claude-sonnet-4-6 | 8.0% | **100.0%** | +92.0 | 100% | $0.284 |
+| **gpt-4o-mini** | 9.0% | **94.0%** | +85.0 | 100% | **$0.012** |
+| groq/llama-3.1-8b-instant | 8.0% | 91.0% | +83.0 | 100% | **$0.0038** |
+| gpt-4o | 8.0% | 91.0% | +83.0 | 100% | $0.192 |
+
+1. **The mirror image of the medical study**: here every model's closed-book
+   baseline collapses to ~8-10% (the facts are private; the remaining points come
+   from correctly abstaining on unanswerable questions), and retrieval recovers
+   87-100%.
+2. **Retrieval was never the bottleneck** (recall@4 = 100% on this corpus): the
+   87→100% spread between models is entirely about *reading* the retrieved
+   context — and reranking still adds +2 to +4 points on three of the four
+   models by putting the right chunk first.
+3. **An 8B model with RAG (91%) beats every model without it** — retrieval, not
+   parameter count, is what buys accuracy when knowledge is the constraint.
+
+> Snapshot of one run (July 2026). llama-3.3-70b hit a daily API quota mid-run
+> and is absent. Re-run to reproduce: `make benchmark studies="rag_document_qa"`.
 
 ---
 
@@ -322,6 +358,13 @@ llm-diagnostic-framework/
 │   │   ├── prompt_engineering.py
 │   │   ├── rag_system.py
 │   │   └── base_strategy.py
+│   ├── rag/                     # Modular RAG pipeline
+│   │   ├── ingestion.py        # corpus loading
+│   │   ├── chunking.py         # paragraph-aware chunks + overlap
+│   │   ├── embeddings.py       # dense (MiniLM) or TF-IDF backends
+│   │   ├── vector_store.py     # in-memory cosine store
+│   │   ├── reranker.py         # cross-encoder second stage
+│   │   └── pipeline.py         # retrieve → rerank → grounded answer
 │   ├── utils/                   # Helpers
 │   │   └── case_study_reporter.py  # HTML report generation
 │   └── cli.py                   # Console entry points (llm-diagnose/-improve/-report)

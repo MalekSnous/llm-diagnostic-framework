@@ -38,10 +38,14 @@ TIERS = ["easy", "medium", "hard", "expert"]
 PE = "Prompt Engineering"
 
 # Per-study display metadata; unknown studies fall back to a generic entry.
+# imp_label = column header for the best improvement arm; imp_name = how the
+# improvement is called in prose findings.
 STUDY_META = {
     "medical_entity_extraction": {
         "title": "medical entity extraction",
         "metric": "F1",
+        "imp_label": "+Prompt Eng",
+        "imp_name": "Prompt engineering",
         "lead": (
             "Same clinical dataset (easy → expert), one harness. Quality is "
             "entity-extraction <strong>F1</strong> (precision/recall, verbosity-robust); "
@@ -53,6 +57,8 @@ STUDY_META = {
     "text_to_sql": {
         "title": "text-to-SQL",
         "metric": "execution accuracy",
+        "imp_label": "+Prompt Eng",
+        "imp_name": "Prompt engineering",
         "lead": (
             "Same question set over one SQLite schema, one harness. Quality is "
             "<strong>execution accuracy</strong> — the generated SQL is executed and its "
@@ -63,6 +69,22 @@ STUDY_META = {
         "diff_lead": "Where each model breaks down as queries get harder "
         "(single-table filters → multi-join analytics).",
     },
+    "rag_document_qa": {
+        "title": "RAG document QA",
+        "metric": "accuracy",
+        "imp_label": "+RAG",
+        "imp_name": "RAG",
+        "lead": (
+            "100 questions about a fictional internal platform whose facts exist only in "
+            "a private knowledge base — no model can know them from training. Baseline = "
+            "closed-book; +RAG = the same model reading chunks retrieved (and reranked) "
+            "from the indexed docs. Accuracy uses digit-boundary matching against accepted "
+            "answers, and the expert tier includes unanswerable questions where the right "
+            "behaviour is to abstain. Cost is real token cost."
+        ),
+        "diff_lead": "Closed-book accuracy by difficulty (verbatim lookups → "
+        "cross-document reasoning and abstention).",
+    },
 }
 
 
@@ -72,6 +94,8 @@ def study_meta(study: str) -> dict:
         {
             "title": study.replace("_", " "),
             "metric": "accuracy",
+            "imp_label": "+Prompt Eng",
+            "imp_name": "Prompt engineering",
             "lead": (
                 "Same dataset, one harness. Quality vs real token cost; "
                 "baseline = zero-shot, +Prompt Eng = few-shot prompting."
@@ -110,7 +134,7 @@ def render_console(data_by_model: dict[str, dict], study: str) -> None:
     table = Table(title=f"Model comparison — {meta['title']} ({meta['metric']})", show_header=True)
     table.add_column("Model", style="cyan")
     table.add_column(f"Baseline {meta['metric']}", justify="right", style="green")
-    table.add_column("+Prompt Eng", justify="right", style="green")
+    table.add_column(meta["imp_label"], justify="right", style="green")
     table.add_column("Δ", justify="right", style="magenta")
     table.add_column("Cost (USD)", justify="right", style="yellow")
     for model in sorted(data_by_model):
@@ -127,8 +151,9 @@ def render_console(data_by_model: dict[str, dict], study: str) -> None:
     console.print(table)
 
 
-def _findings(data_by_model: dict[str, dict], metric: str = "F1") -> list[str]:
+def _findings(data_by_model: dict[str, dict], meta: dict) -> list[str]:
     """Auto-generate interpretation bullets from the numbers."""
+    metric, imp_name = meta["metric"], meta["imp_name"]
     out: list[str] = []
     rows = []
     for model, d in data_by_model.items():
@@ -149,31 +174,32 @@ def _findings(data_by_model: dict[str, dict], metric: str = "F1") -> list[str]:
     gains = [(m, pe - base) for m, base, pe, _, _ in rows]
     mg = max(gains, key=lambda x: x[1])
     if mg[1] > 0.01:
-        out.append(
-            f"**Prompt engineering helps most** on {mg[0]} ({mg[1] * 100:+.1f} {metric} points)."
-        )
+        out.append(f"**{imp_name} helps most** on {mg[0]} ({mg[1] * 100:+.1f} {metric} points).")
 
     # A very low baseline that jumps with few-shot is usually a format artifact
-    # (prose / invalid output the parser rejects), not weak capability.
-    fmt = [m for m, base, pe, _, _ in rows if base < 0.30 and (pe - base) > 0.30]
-    if fmt:
-        out.append(
-            f"**Low baseline ≠ weak model:** {', '.join(fmt)} scored low at baseline mainly by "
-            f"answering in an unstructured format the scorer rejects; few-shot standardised the "
-            f"output (hence the large jump). Read baseline-vs-prompt as much about output format "
-            f"as raw capability."
-        )
+    # (prose / invalid output the parser rejects), not weak capability. Only a
+    # prompt-engineering story: for RAG a low closed-book baseline is the point.
+    if imp_name == "Prompt engineering":
+        fmt = [m for m, base, pe, _, _ in rows if base < 0.30 and (pe - base) > 0.30]
+        if fmt:
+            out.append(
+                f"**Low baseline ≠ weak model:** {', '.join(fmt)} scored low at baseline mainly by "
+                f"answering in an unstructured format the scorer rejects; few-shot standardised the "
+                f"output (hence the large jump). Read baseline-vs-prompt as much about output format "
+                f"as raw capability."
+            )
     hurts = [m for m, delta in gains if delta < -0.01]
     if hurts:
         out.append(
-            f"**Prompt engineering *hurt*** {', '.join(hurts)} — generic few-shot added noise."
+            f"**{imp_name} *hurt*** {', '.join(hurts)} — the added context brought more "
+            f"noise than signal."
         )
 
     paid = [r for r in rows if r[4] > 0]
-    if paid:
+    if len(paid) >= 2:
         cheapest = min(paid, key=lambda r: r[4])
         priciest = max(paid, key=lambda r: r[4])
-        if priciest[4] > 0 and cheapest[4] > 0:
+        if priciest[0] != cheapest[0]:
             ratio = priciest[4] / cheapest[4]
             out.append(
                 f"**Cost spread is huge:** {priciest[0]} costs ~{ratio:.0f}× more than "
@@ -208,7 +234,7 @@ def render_markdown(data_by_model: dict[str, dict], study: str) -> str:
     meta = study_meta(study)
     lines = [
         f"# Model comparison — {meta['title']} ({meta['metric']})\n",
-        f"| Model | Baseline {meta['metric']} | +Prompt Eng | Δ | Cost (USD) |",
+        f"| Model | Baseline {meta['metric']} | {meta['imp_label']} | Δ | Cost (USD) |",
         "|---|---:|---:|---:|---:|",
     ]
     for model in sorted(data_by_model):
@@ -232,7 +258,7 @@ def render_markdown(data_by_model: dict[str, dict], study: str) -> str:
             cells = " | ".join(f"{by[t]:.0%}" if t in by else "—" for t in TIERS)
             lines.append(f"| {model} | {cells} |")
 
-    findings = _findings(data_by_model, meta["metric"])
+    findings = _findings(data_by_model, meta)
     if findings:
         lines += ["\n## Findings\n"] + [f"- {f}" for f in findings]
     return "\n".join(lines) + "\n"
@@ -259,7 +285,7 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
         tiles = report_theme.stat_tile("Models compared", str(len(rows)), "same harness")
         tiles += report_theme.stat_tile(f"Best {metric}", f"{top[3]:.1%}", html.escape(top[0]))
         tiles += report_theme.stat_tile(
-            "Biggest prompt-eng gain",
+            f"Biggest {meta['imp_name'].lower()} gain",
             f"{(mg[2] - mg[1]) * 100:+.1f} pts",
             html.escape(mg[0]),
             delta_good=(mg[2] - mg[1]) >= 0,
@@ -276,9 +302,9 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
 
     # Graphiques
     bars = report_theme.chart_figure(
-        f"{metric.capitalize()} by model — baseline vs prompt engineering",
+        f"{metric.capitalize()} by model — baseline vs {meta['imp_name'].lower()}",
         f"{metric.capitalize()} on the same dataset; longer is better.",
-        [("Baseline (zero-shot)", "var(--s1)"), ("+Prompt engineering (few-shot)", "var(--s2)")],
+        [("Baseline", "var(--s1)"), (meta["imp_label"], "var(--s2)")],
         report_theme.svg_grouped_bars([(m, b, p) for m, b, p, _, _ in rows]),
     )
     scatter_svg = report_theme.svg_cost_quality_scatter([(m, c, best) for m, _, _, best, c in rows])
@@ -304,7 +330,7 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
             f"<td class='num'>${cost:.4f}</td></tr>\n"
         )
     table_html = f"""<div class="tablewrap"><table>
-<thead><tr><th>Model</th><th class="num">Baseline {metric}</th><th class="num">+Prompt Eng</th>
+<thead><tr><th>Model</th><th class="num">Baseline {metric}</th><th class="num">{meta["imp_label"]}</th>
 <th class="num">Δ (pts)</th><th class="num">Cost (USD)</th></tr></thead>
 <tbody>
 {trows}</tbody></table></div>"""
@@ -331,7 +357,7 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
             "this table.</em></p>"
         )
 
-    findings = _findings(data_by_model, metric)
+    findings = _findings(data_by_model, meta)
     findings_html = ""
     if findings:
         items = ""
@@ -343,7 +369,8 @@ def render_html(data_by_model: dict[str, dict], study: str) -> str:
 
     head_html = report_theme.page_head(
         f"Model comparison — {meta['title']}",
-        f"Cross-model benchmark: {metric} vs real token cost, baseline vs prompt engineering.",
+        f"Cross-model benchmark: {metric} vs real token cost, "
+        f"baseline vs {meta['imp_name'].lower()}.",
     )
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
@@ -380,7 +407,7 @@ def main() -> None:
         return
 
     render_console(data, args.study)
-    for f in _findings(data, study_meta(args.study)["metric"]):
+    for f in _findings(data, study_meta(args.study)):
         console.print(f"  • {f.replace('**', '')}")
 
     DOCS.mkdir(exist_ok=True)

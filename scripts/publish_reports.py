@@ -93,7 +93,7 @@ def _comparison_card(path: Path) -> str:
         '      <div class="card">'
         '<span class="tag">Cross-model</span>'
         f"<h3>{t}</h3>"
-        "<p>One harness, several providers — baseline vs prompt engineering, "
+        "<p>One harness, several providers — baseline vs improvement strategy, "
         "with charts, per-difficulty breakdown and auto-generated findings.</p>"
         f'<a href="{f}">Open the comparison &rarr;</a></div>'
     )

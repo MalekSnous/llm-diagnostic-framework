@@ -178,13 +178,13 @@ compare-medical:
 	@echo "Comparison written to docs/comparison_medical_entity_extraction.html"
 
 # Full benchmark: every model × every benchmarkable study (medical without RAG,
-# text-to-SQL), then rebuild the cross-model comparison for each study that ran
+# text-to-SQL, RAG document QA), then rebuild the cross-model comparison for each study that ran
 # and publish everything to docs/. Study failures (missing key, no local model)
 # are non-fatal so the rest of the matrix still runs. Override either axis:
 #   make benchmark models="gpt-4o-mini groq/llama-3.1-8b-instant"
 #   make benchmark models="gpt-4o claude-sonnet-4-6" studies="text_to_sql"
 BENCH_MODELS ?= gpt-4o gpt-4o-mini claude-sonnet-4-6 groq/llama-3.1-8b-instant groq/llama-3.3-70b-versatile
-BENCH_STUDIES ?= medical_entity_extraction text_to_sql
+BENCH_STUDIES ?= medical_entity_extraction text_to_sql rag_document_qa
 benchmark:
 	@for m in $(or $(models),$(BENCH_MODELS)); do \
 	  for s in $(or $(studies),$(BENCH_STUDIES)); do \
