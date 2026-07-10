@@ -184,6 +184,26 @@ class Evaluator:
         return metrics
 
     @staticmethod
+    def parse_sql_query(text: str) -> Optional[str]:
+        """Extract a single SQL SELECT/WITH statement from an LLM response.
+
+        Handles fenced code blocks (```sql ... ```), surrounding prose, and
+        trailing statement terminators. Returns the first statement starting
+        at SELECT or WITH, cut at the first ``;`` so only one statement can
+        ever reach execution. Returns ``None`` when no candidate is found.
+        """
+        if not text:
+            return None
+        # Prefer the content of a fenced code block when present.
+        fence = re.search(r"```(?:sql)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+        candidate = fence.group(1) if fence else text
+        match = re.search(r"\b(?:select|with)\b.*", candidate, re.DOTALL | re.IGNORECASE)
+        if not match:
+            return None
+        sql = match.group(0).split(";", 1)[0].strip()
+        return sql or None
+
+    @staticmethod
     def structure_validation_metrics(
         predictions: List[str], expected_format: str = "json"
     ) -> EvaluationMetrics:

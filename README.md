@@ -26,6 +26,9 @@ strategy (prompt engineering, RAG, fine-tuning) under one harness, and reports
 - **Quality** — task-appropriate metrics. For entity extraction it uses
   **precision / recall / F1** (via `Evaluator.fuzzy_entity_metrics`), not a
   recall-only substring scan — so a verbose model can't win just by dumping text.
+  For text-to-SQL it goes further: the generated query is **executed** and its
+  result set compared to the gold query's (**execution accuracy**) — a metric
+  that can't be gamed by formatting at all.
 - **Cost** — real token cost per provider (OpenAI per-1K, Anthropic per-1M),
   local models at $0.
 
@@ -111,8 +114,8 @@ python scripts/generate_report.py \
 
 ## 📊 Case Studies
 
-Two studies designed to tell **opposite** stories — which is the whole point:
-optimization is task-dependent, so you must measure.
+Three studies, three **metric families** — because the right metric is
+task-dependent, and so is the right optimization:
 
 ### 1. Medical Entity Extraction — when optimization can *hurt*
 
@@ -140,7 +143,34 @@ pip install -e ".[rag]"
 python case_studies/rag_document_qa/run_study.py --model gpt-4o-mini
 ```
 
+### 3. Text-to-SQL — a metric you can't game
+
+Natural-language questions over an e-commerce SQLite schema. The model's SQL is
+**executed** against the seeded database and its result set compared to the gold
+query's — **execution accuracy**. Verbosity, fences, aliases, row order: none of
+it can inflate the score. ~100 questions in four difficulty tiers (single-table
+filters → anti-joins and nested aggregates).
+
+```bash
+python case_studies/text_to_sql/run_study.py --model gpt-4o-mini
+```
+
+RAG is deliberately skipped here (the schema fits in the prompt); the comparison
+is zero-shot vs few-shot SQL examples.
+
 Each study writes a JSON + interactive HTML report to `results/case_studies/`.
+
+### Run the whole benchmark in one command
+
+```bash
+make benchmark models="gpt-4o-mini groq/llama-3.1-8b-instant"
+# → runs every study for every model, rebuilds the cross-model comparison
+#   pages, and publishes all reports to docs/ (GitHub Pages deploys on push)
+```
+
+Omit `models=...` to use the default 5-model list (`BENCH_MODELS` in the
+Makefile). Failures for individual models (missing key, etc.) are non-fatal —
+whatever ran still gets compared and published.
 
 ---
 
@@ -301,7 +331,8 @@ llm-diagnostic-framework/
 │   └── generate_report.py
 ├── case_studies/                # Complete examples
 │   ├── medical_entity_extraction/   # RAG/prompting can *hurt* a strong model
-│   └── rag_document_qa/             # RAG *wins* on private-document QA
+│   ├── rag_document_qa/             # RAG *wins* on private-document QA
+│   └── text_to_sql/                 # execution accuracy — a metric you can't game
 ├── data/                        # Domain data (knowledge bases, doc corpora)
 ├── results/                     # Output reports (JSON + HTML)
 ├── tests/                       # Offline pytest suite (mocked LLM client)

@@ -33,13 +33,15 @@ class PromptEngineeringStrategy(BaseImprovementStrategy):
 
         Args:
             technique: "few-shot", "chain-of-thought", "structured", or "combined"
-            **kwargs: Additional parameters
+            **kwargs: Additional parameters. ``examples`` (list of strings) makes
+                few-shot use task-specific examples instead of the built-in ones.
         """
         return ImprovementConfig(
             strategy_name=self.name,
             parameters={
                 "technique": technique,
                 "num_examples": kwargs.get("num_examples", 3),
+                "examples": kwargs.get("examples"),
                 "use_cot": kwargs.get("use_cot", False),
                 "use_structure": kwargs.get("use_structure", False),
             },
@@ -65,7 +67,9 @@ class PromptEngineeringStrategy(BaseImprovementStrategy):
             # Build improved prompt based on technique
             if technique == "few-shot":
                 improved_prompt = self._add_few_shot_examples(
-                    test_case.input, num_examples=config.parameters["num_examples"]
+                    test_case.input,
+                    num_examples=config.parameters["num_examples"],
+                    examples=config.parameters.get("examples"),
                 )
 
             elif technique == "chain-of-thought":
@@ -148,11 +152,16 @@ class PromptEngineeringStrategy(BaseImprovementStrategy):
     # """
     #        return examples + prompt
 
-    def _add_few_shot_examples(self, prompt, num_examples=3):
-        """Add few-shot examples for medical entity extraction."""
+    def _add_few_shot_examples(self, prompt, num_examples=3, examples=None):
+        """Add few-shot examples to the prompt.
 
+        Task-specific ``examples`` (from ``configure(examples=...)``) take
+        precedence; otherwise fall back to the built-in heuristic ones.
+        """
+        if examples:
+            pass  # caller-provided, task-specific
         # Détecter si c'est une tâche médicale
-        if "medical entities" in prompt.lower() or "extract" in prompt.lower():
+        elif "medical entities" in prompt.lower() or "extract" in prompt.lower():
             examples = [
                 "Example: From 'Patient with diabetes on insulin', extract: diabetes, insulin",
                 "Example: From 'Diagnosed with pneumonia, prescribed antibiotics', extract: pneumonia, antibiotics",

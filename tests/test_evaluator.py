@@ -75,6 +75,32 @@ def test_fuzzy_entity_metrics_penalises_verbosity():
     assert m.metrics["f1"] < 0.7  # so F1 is not inflated
 
 
+def test_parse_sql_query_variants():
+    # Bare statement, with or without a trailing semicolon.
+    assert Evaluator.parse_sql_query("SELECT 1;") == "SELECT 1"
+    assert Evaluator.parse_sql_query("select name from t") == "select name from t"
+
+    # Fenced code block with prose around it.
+    fenced = "Here is the query:\n```sql\nSELECT name FROM customers;\n```\nHope this helps!"
+    assert Evaluator.parse_sql_query(fenced) == "SELECT name FROM customers"
+
+    # Prose lead-in without a fence: extraction starts at SELECT.
+    prose = "The answer is: SELECT COUNT(*) FROM orders WHERE status = 'pending'"
+    assert Evaluator.parse_sql_query(prose) == (
+        "SELECT COUNT(*) FROM orders WHERE status = 'pending'"
+    )
+
+    # CTEs are statements too.
+    assert Evaluator.parse_sql_query("WITH t AS (SELECT 1) SELECT * FROM t").startswith("WITH")
+
+    # Only the first statement survives (anything after ';' is cut).
+    assert Evaluator.parse_sql_query("SELECT 1; DROP TABLE customers") == "SELECT 1"
+
+    # No SQL at all.
+    assert Evaluator.parse_sql_query("I cannot answer that.") is None
+    assert Evaluator.parse_sql_query("") is None
+
+
 def test_cost_analysis():
     responses = [
         LLMResponse("a", "m", tokens_used=10, latency_ms=5.0, cost_usd=0.01),

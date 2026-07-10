@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Text To Sql — groq/llama-3.3-70b-versatile — Case Study Report</title>
+<meta name="description" content="Baseline vs improvement strategies for groq/llama-3.3-70b-versatile: accuracy and real token cost."/>
+<style>
+:root {
+  --bg: #f6f8fa; --card: #ffffff; --card2: #eef1f4; --border: #d0d7de;
+  --text: #1f2328; --muted: #59636e; --faint: #818b98;
+  --accent: #4f63d2; --accent2: #8250df; --good: #1a7f37; --bad: #d1242f;
+  --s1: #2a78d6; --s2: #1baf7a; --grid: #e4e7eb;
+  --hero-from: #3b4db8; --hero-to: #7b3fd4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --card: #161b22; --card2: #1f2630; --border: #30363d;
+    --text: #e6edf3; --muted: #9da7b3; --faint: #6e7a87;
+    --accent: #6e8efb; --accent2: #a777e3; --good: #3fb950; --bad: #f85149;
+    --s1: #3987e5; --s2: #199e70; --grid: #262d36;
+    --hero-from: #2b3a8f; --hero-to: #5b2fa3;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text); line-height: 1.6;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+h1 { font-size: 1.9rem; margin: 0 0 10px; letter-spacing: -0.02em; }
+h2 { font-size: 1.35rem; margin: 40px 0 8px; letter-spacing: -0.01em; }
+.lead { color: var(--muted); margin: 0 0 20px; }
+.crumb { font-size: .9rem; color: var(--muted); margin: 28px 0 18px; display: inline-block; }
+
+/* Hero (bandeau haut de page) */
+.hero {
+  background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-to) 100%);
+  color: #fff; padding: 56px 0 48px;
+}
+.hero h1 { color: #fff; }
+.hero .lead { color: rgba(255,255,255,.85); max-width: 640px; }
+.hero a.crumb { color: rgba(255,255,255,.8); margin: 0 0 14px; }
+
+/* Stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+         gap: 14px; margin: 22px 0; }
+.tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+        padding: 16px 18px; }
+.tile .label { font-size: .82rem; color: var(--muted); margin-bottom: 4px; }
+.tile .value { font-size: 1.45rem; font-weight: 650; line-height: 1.2; }
+.tile .detail { font-size: .82rem; color: var(--muted); margin-top: 4px;
+                overflow-wrap: anywhere; }
+.tile .delta-good { color: var(--good); font-weight: 600; }
+.tile .delta-bad { color: var(--bad); font-weight: 600; }
+
+/* Figures / charts */
+figure.chart { margin: 22px 0; background: var(--card); border: 1px solid var(--border);
+               border-radius: 12px; padding: 18px 18px 10px; }
+figure.chart figcaption { font-weight: 600; margin-bottom: 2px; }
+figure.chart .sub { font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+figure.chart svg { width: 100%; height: auto; display: block; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: .84rem;
+          color: var(--muted); margin: 6px 0 10px; }
+.legend .key { display: inline-flex; align-items: center; gap: 7px; }
+.legend .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+/* Tables */
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px;
+             background: var(--card); margin: 16px 0; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--border);
+         white-space: nowrap; }
+th { background: var(--card2); font-weight: 600; font-size: .86rem; color: var(--muted); }
+tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pos { color: var(--good); font-weight: 600; }
+.neg { color: var(--bad); font-weight: 600; }
+
+/* Cards & callouts */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+        padding: 20px; transition: border-color .15s, transform .15s; }
+.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.card p { color: var(--muted); margin: 0 0 12px; font-size: .92rem; }
+.tag { display: inline-block; font-size: .72rem; font-weight: 600; padding: 2px 9px;
+       border-radius: 999px; margin-bottom: 10px;
+       background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.callout { background: color-mix(in srgb, var(--accent) 7%, var(--card));
+           border: 1px solid var(--border); border-left: 4px solid var(--accent);
+           border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+.callout h3 { margin: 0 0 6px; font-size: 1rem; }
+.findings { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; }
+.findings li { background: var(--card); border: 1px solid var(--border);
+               border-radius: 10px; padding: 12px 16px; font-size: .94rem; }
+.findings li strong { color: var(--accent); }
+
+/* Buttons */
+.btns { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 11px 20px; border-radius: 10px; font-weight: 600;
+       border: 1px solid var(--border); background: var(--card); color: var(--text); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn:hover { text-decoration: none; border-color: var(--accent); }
+.hero .btn { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.45); color: #fff; }
+.hero .btn.primary { background: #fff; border-color: #fff; color: var(--hero-from); }
+
+code { background: var(--card2); padding: 2px 6px; border-radius: 5px; font-size: .88em; }
+pre { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+footer { padding: 34px 0 40px; color: var(--muted); font-size: .9rem;
+         border-top: 1px solid var(--border); margin-top: 48px; }
+</style>
+</head>
+<body>
+    <div class="wrap">
+        <a class="crumb" href="index.html">&larr; LLM Diagnostic Framework</a>
+        <h1>📊 Text To Sql</h1>
+        <p class="lead">Case study report — <strong>groq/llama-3.3-70b-versatile</strong>,
+        baseline vs improvement strategies, scored on the same test set with real token cost.</p>
+
+        <div class="tiles"><div class="tile"><div class="label">Model</div><div class="value">groq/llama-3.3-70b-versatile</div><div class="detail">run 2026-07-10 13:18</div></div><div class="tile"><div class="label">Baseline accuracy</div><div class="value">96.0%</div><div class="detail">zero-shot</div></div><div class="tile"><div class="label">Best improvement</div><div class="value">+1.0 pts</div><div class="detail delta-good">vs baseline</div></div><div class="tile"><div class="label">Baseline cost</div><div class="value">$0.0205</div><div class="detail">full run</div></div></div>
+
+        <figure class="chart"><figcaption>Accuracy by strategy</figcaption><div class="sub">Same test set, same model — only the strategy changes.</div><svg viewBox="0 0 720 126" role="img" aria-label="Bar chart"><line x1="8.0" y1="6" x2="8.0" y2="104" stroke="var(--grid)" stroke-width="1"/><text x="8.0" y="118" text-anchor="middle" font-size="11" fill="var(--faint)">0%</text><line x1="170.0" y1="6" x2="170.0" y2="104" stroke="var(--grid)" stroke-width="1"/><text x="170.0" y="118" text-anchor="middle" font-size="11" fill="var(--faint)">25%</text><line x1="332.0" y1="6" x2="332.0" y2="104" stroke="var(--grid)" stroke-width="1"/><text x="332.0" y="118" text-anchor="middle" font-size="11" fill="var(--faint)">50%</text><line x1="494.0" y1="6" x2="494.0" y2="104" stroke="var(--grid)" stroke-width="1"/><text x="494.0" y="118" text-anchor="middle" font-size="11" fill="var(--faint)">75%</text><line x1="656.0" y1="6" x2="656.0" y2="104" stroke="var(--grid)" stroke-width="1"/><text x="656.0" y="118" text-anchor="middle" font-size="11" fill="var(--faint)">100%</text><text x="8" y="18" font-size="12.5" font-weight="600" fill="var(--text)">Baseline (zero-shot)</text><path d="M8.0,26.0 h618.1 a4.0,4.0 0 0 1 4.0,4.0 v10.0 a4.0,4.0 0 0 1 -4.0,4.0 h-618.1 z" fill="var(--s1)"><title>Baseline (zero-shot): 96.0%</title></path><text x="637.1" y="39.0" font-size="11.5" fill="var(--muted)">96.0%</text><text x="8" y="72" font-size="12.5" font-weight="600" fill="var(--text)">Prompt Engineering</text><path d="M8.0,80.0 h624.6 a4.0,4.0 0 0 1 4.0,4.0 v10.0 a4.0,4.0 0 0 1 -4.0,4.0 h-624.6 z" fill="var(--s1)"><title>Prompt Engineering: 97.0%</title></path><text x="643.6" y="93.0" font-size="11.5" fill="var(--muted)">97.0%</text></svg></figure>
+
+        <h2>📈 Results summary</h2>
+        <div class="tablewrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th class="num">Accuracy</th>
+                        <th class="num">Improvement</th>
+                        <th class="num">Cost</th>
+                        <th class="num">Cost per point</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+            <tr>
+                <td><strong>Baseline (Zero-shot)</strong></td>
+                <td class="num">96.0%</td>
+                <td class="num">-</td>
+                <td class="num">$0.0205</td>
+                <td class="num">-</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Prompt Engineering</strong></td>
+                <td class="num">97.0%</td>
+                <td class="num pos">+1.0%</td>
+                <td class="num">$0.0276</td>
+                <td class="num">$0.03</td>
+            </tr>
+            
+                </tbody>
+            </table>
+        </div>
+
+        
+
+        
+            <div class="callout">
+                <h3>✅ Recommendation</h3>
+                <p>
+                    Based on the results, <strong>Prompt Engineering</strong>
+                    achieves the best performance with
+                    97.0% accuracy
+                    (+1.0 pts vs baseline).
+                </p>
+            </div>
+            
+
+        <footer>Generated by
+            <a href="https://github.com/MalekSnous/llm-diagnostic-framework">LLM Diagnostic
+            Framework</a> · run 2026-07-10 13:18 · <a href="index.html">Back to overview</a>
+        </footer>
+    </div>
+</body>
+</html>

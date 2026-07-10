@@ -11,8 +11,9 @@ writes a self-contained HTML + Markdown report with:
 
 Usage:
     python scripts/compare_models.py --study medical_entity_extraction
+    python scripts/compare_models.py --study text_to_sql
 
-Typically run via ``make compare-medical`` (which runs the studies first).
+Typically run via ``make benchmark`` (which runs the studies first).
 """
 
 from __future__ import annotations
@@ -35,6 +36,49 @@ console = Console()
 
 TIERS = ["easy", "medium", "hard", "expert"]
 PE = "Prompt Engineering"
+
+# Per-study display metadata; unknown studies fall back to a generic entry.
+STUDY_META = {
+    "medical_entity_extraction": {
+        "title": "medical entity extraction",
+        "metric": "F1",
+        "lead": (
+            "Same clinical dataset (easy → expert), one harness. Quality is "
+            "entity-extraction <strong>F1</strong> (precision/recall, verbosity-robust); "
+            "cost is real token cost. Baseline = zero-shot; +Prompt Eng = few-shot prompting."
+        ),
+        "diff_lead": "Where each model breaks down as notes get denser "
+        "(explicit → clinical shorthand).",
+    },
+    "text_to_sql": {
+        "title": "text-to-SQL",
+        "metric": "execution accuracy",
+        "lead": (
+            "Same question set over one SQLite schema, one harness. Quality is "
+            "<strong>execution accuracy</strong> — the generated SQL is executed and its "
+            "result set compared to the gold query's, so verbosity and formatting tricks "
+            "can't inflate the score. Cost is real token cost. Baseline = zero-shot with "
+            "the schema in the prompt; +Prompt Eng = few-shot SQL examples."
+        ),
+        "diff_lead": "Where each model breaks down as queries get harder "
+        "(single-table filters → multi-join analytics).",
+    },
+}
+
+
+def study_meta(study: str) -> dict:
+    return STUDY_META.get(
+        study,
+        {
+            "title": study.replace("_", " "),
+            "metric": "accuracy",
+            "lead": (
+                "Same dataset, one harness. Quality vs real token cost; "
+                "baseline = zero-shot, +Prompt Eng = few-shot prompting."
+            ),
+            "diff_lead": "Per-difficulty breakdown of the baseline.",
+        },
+    )
 
 
 def latest_per_model(study: str) -> dict[str, dict]:
@@ -61,10 +105,11 @@ def _best_improvement(data: dict) -> tuple[str | None, dict]:
     return name, imps[name]
 
 
-def render_console(data_by_model: dict[str, dict]) -> None:
-    table = Table(title="Model comparison — medical entity extraction (F1)", show_header=True)
+def render_console(data_by_model: dict[str, dict], study: str) -> None:
+    meta = study_meta(study)
+    table = Table(title=f"Model comparison — {meta['title']} ({meta['metric']})", show_header=True)
     table.add_column("Model", style="cyan")
-    table.add_column("Baseline F1", justify="right", style="green")
+    table.add_column(f"Baseline {meta['metric']}", justify="right", style="green")
     table.add_column("+Prompt Eng", justify="right", style="green")
     table.add_column("Δ", justify="right", style="magenta")
     table.add_column("Cost (USD)", justify="right", style="yellow")
@@ -82,7 +127,7 @@ def render_console(data_by_model: dict[str, dict]) -> None:
     console.print(table)
 
 
-def _findings(data_by_model: dict[str, dict]) -> list[str]:
+def _findings(data_by_model: dict[str, dict], metric: str = "F1") -> list[str]:
     """Auto-generate interpretation bullets from the numbers."""
     out: list[str] = []
     rows = []
@@ -99,21 +144,24 @@ def _findings(data_by_model: dict[str, dict]) -> list[str]:
         return out
 
     top = max(rows, key=lambda r: r[3])
-    out.append(f"**Best quality:** {top[0]} reaches F1 {top[3]:.1%}.")
+    out.append(f"**Best quality:** {top[0]} reaches {metric} {top[3]:.1%}.")
 
     gains = [(m, pe - base) for m, base, pe, _, _ in rows]
     mg = max(gains, key=lambda x: x[1])
     if mg[1] > 0.01:
-        out.append(f"**Prompt engineering helps most** on {mg[0]} ({mg[1] * 100:+.1f} F1 points).")
+        out.append(
+            f"**Prompt engineering helps most** on {mg[0]} ({mg[1] * 100:+.1f} {metric} points)."
+        )
 
-    # A very low baseline that jumps with few-shot is usually a formatting
-    # artifact (model answered in prose), not weak extraction.
+    # A very low baseline that jumps with few-shot is usually a format artifact
+    # (prose / invalid output the parser rejects), not weak capability.
     fmt = [m for m, base, pe, _, _ in rows if base < 0.30 and (pe - base) > 0.30]
     if fmt:
         out.append(
             f"**Low baseline ≠ weak model:** {', '.join(fmt)} scored low at baseline mainly by "
-            f"answering in prose; few-shot standardised the output format (hence the large jump). "
-            f"Read baseline-vs-prompt as much about output format as raw capability."
+            f"answering in an unstructured format the scorer rejects; few-shot standardised the "
+            f"output (hence the large jump). Read baseline-vs-prompt as much about output format "
+            f"as raw capability."
         )
     hurts = [m for m, delta in gains if delta < -0.01]
     if hurts:
@@ -131,9 +179,9 @@ def _findings(data_by_model: dict[str, dict]) -> list[str]:
                 f"**Cost spread is huge:** {priciest[0]} costs ~{ratio:.0f}× more than "
                 f"{cheapest[0]} for this run."
             )
-        # value = F1 per dollar, paid models only
+        # value = quality per dollar, paid models only
         value = max(paid, key=lambda r: r[3] / r[4] if r[4] else 0)
-        out.append(f"**Best value (F1 per $):** {value[0]}.")
+        out.append(f"**Best value ({metric} per $):** {value[0]}.")
 
     # bigger-isn't-better: a cheaper model matching/beating a pricier one
     if len(paid) >= 2:
@@ -141,7 +189,7 @@ def _findings(data_by_model: dict[str, dict]) -> list[str]:
         if s[0][3] >= s[-1][3] - 0.02:
             out.append(
                 f"**Bigger ≠ better:** {s[0][0]} matches the most expensive model "
-                f"within 2 F1 points at a fraction of the cost."
+                f"within 2 {metric} points at a fraction of the cost."
             )
     return out
 
@@ -156,10 +204,11 @@ def _difficulty_rows(data_by_model: dict[str, dict]):
     return rows
 
 
-def render_markdown(data_by_model: dict[str, dict]) -> str:
+def render_markdown(data_by_model: dict[str, dict], study: str) -> str:
+    meta = study_meta(study)
     lines = [
-        "# Model comparison — medical entity extraction (F1)\n",
-        "| Model | Baseline F1 | +Prompt Eng | Δ | Cost (USD) |",
+        f"# Model comparison — {meta['title']} ({meta['metric']})\n",
+        f"| Model | Baseline {meta['metric']} | +Prompt Eng | Δ | Cost (USD) |",
         "|---|---:|---:|---:|---:|",
     ]
     for model in sorted(data_by_model):
@@ -174,20 +223,25 @@ def render_markdown(data_by_model: dict[str, dict]) -> str:
 
     diff = _difficulty_rows(data_by_model)
     if diff:
-        lines += ["\n## Baseline F1 by difficulty\n", "| Model | " + " | ".join(TIERS) + " |"]
+        lines += [
+            f"\n## Baseline {meta['metric']} by difficulty\n",
+            "| Model | " + " | ".join(TIERS) + " |",
+        ]
         lines.append("|---" * (len(TIERS) + 1) + "|")
         for model, by in diff:
             cells = " | ".join(f"{by[t]:.0%}" if t in by else "—" for t in TIERS)
             lines.append(f"| {model} | {cells} |")
 
-    findings = _findings(data_by_model)
+    findings = _findings(data_by_model, meta["metric"])
     if findings:
         lines += ["\n## Findings\n"] + [f"- {f}" for f in findings]
     return "\n".join(lines) + "\n"
 
 
-def render_html(data_by_model: dict[str, dict]) -> str:
-    # (model, baseline_f1, pe_f1, best_f1, cost) — même dérivation que _findings
+def render_html(data_by_model: dict[str, dict], study: str) -> str:
+    meta = study_meta(study)
+    metric = meta["metric"]
+    # (model, baseline_quality, pe_quality, best_quality, cost) — même dérivation que _findings
     rows = []
     for model in sorted(data_by_model):
         d = data_by_model[model]
@@ -202,8 +256,8 @@ def render_html(data_by_model: dict[str, dict]) -> str:
     if rows:
         top = max(rows, key=lambda r: r[3])
         mg = max(rows, key=lambda r: r[2] - r[1])
-        tiles = report_theme.stat_tile("Models compared", str(len(rows)), "same 97-case harness")
-        tiles += report_theme.stat_tile("Best F1", f"{top[3]:.1%}", html.escape(top[0]))
+        tiles = report_theme.stat_tile("Models compared", str(len(rows)), "same harness")
+        tiles += report_theme.stat_tile(f"Best {metric}", f"{top[3]:.1%}", html.escape(top[0]))
         tiles += report_theme.stat_tile(
             "Biggest prompt-eng gain",
             f"{(mg[2] - mg[1]) * 100:+.1f} pts",
@@ -214,16 +268,16 @@ def render_html(data_by_model: dict[str, dict]) -> str:
         if paid:
             value = max(paid, key=lambda r: r[3] / r[4])
             tiles += report_theme.stat_tile(
-                "Best value (F1 per $)",
+                f"Best value ({metric} per $)",
                 html.escape(value[0]),
-                f"F1 {value[3]:.1%} for ${value[4]:.4f}",
+                f"{metric} {value[3]:.1%} for ${value[4]:.4f}",
             )
     tiles_html = f'<div class="tiles">{tiles}</div>' if tiles else ""
 
     # Graphiques
     bars = report_theme.chart_figure(
-        "F1 by model — baseline vs prompt engineering",
-        "Entity-extraction F1 on the same dataset; longer is better.",
+        f"{metric.capitalize()} by model — baseline vs prompt engineering",
+        f"{metric.capitalize()} on the same dataset; longer is better.",
         [("Baseline (zero-shot)", "var(--s1)"), ("+Prompt engineering (few-shot)", "var(--s2)")],
         report_theme.svg_grouped_bars([(m, b, p) for m, b, p, _, _ in rows]),
     )
@@ -231,7 +285,7 @@ def render_html(data_by_model: dict[str, dict]) -> str:
     scatter = (
         report_theme.chart_figure(
             "Cost vs quality",
-            "Best F1 per model against its run cost — up and to the left wins.",
+            f"Best {metric} per model against its run cost — up and to the left wins.",
             [],
             scatter_svg,
         )
@@ -250,7 +304,7 @@ def render_html(data_by_model: dict[str, dict]) -> str:
             f"<td class='num'>${cost:.4f}</td></tr>\n"
         )
     table_html = f"""<div class="tablewrap"><table>
-<thead><tr><th>Model</th><th class="num">Baseline F1</th><th class="num">+Prompt Eng</th>
+<thead><tr><th>Model</th><th class="num">Baseline {metric}</th><th class="num">+Prompt Eng</th>
 <th class="num">Δ (pts)</th><th class="num">Cost (USD)</th></tr></thead>
 <tbody>
 {trows}</tbody></table></div>"""
@@ -266,18 +320,18 @@ def render_html(data_by_model: dict[str, dict]) -> str:
             )
             body += f"<tr><td>{html.escape(model)}</td>{cells}</tr>\n"
         diff_html = f"""
-<h2>Baseline F1 by difficulty</h2>
-<p class="lead">Where each model breaks down as notes get denser (explicit → clinical shorthand).</p>
+<h2>Baseline {metric} by difficulty</h2>
+<p class="lead">{meta["diff_lead"]}</p>
 <div class="tablewrap"><table><thead><tr><th>Model</th>{head}</tr></thead><tbody>
 {body}</tbody></table></div>"""
     else:
         diff_html = (
-            '<h2>Baseline F1 by difficulty</h2><p class="lead"><em>No per-difficulty data in '
-            "these runs — re-run the studies (the saver now captures it) to populate this "
-            "table.</em></p>"
+            f'<h2>Baseline {metric} by difficulty</h2><p class="lead"><em>No per-difficulty '
+            "data in these runs — re-run the studies (the saver now captures it) to populate "
+            "this table.</em></p>"
         )
 
-    findings = _findings(data_by_model)
+    findings = _findings(data_by_model, metric)
     findings_html = ""
     if findings:
         items = ""
@@ -288,9 +342,8 @@ def render_html(data_by_model: dict[str, dict]) -> str:
         findings_html = f'<h2>Findings</h2><ul class="findings">{items}</ul>'
 
     head_html = report_theme.page_head(
-        "Model comparison — medical entity extraction",
-        "Cross-model benchmark: entity-extraction F1 vs real token cost, "
-        "baseline vs prompt engineering.",
+        f"Model comparison — {meta['title']}",
+        f"Cross-model benchmark: {metric} vs real token cost, baseline vs prompt engineering.",
     )
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
@@ -298,10 +351,8 @@ def render_html(data_by_model: dict[str, dict]) -> str:
 </head><body>
 <div class="wrap">
 <a class="crumb" href="index.html">&larr; LLM Diagnostic Framework</a>
-<h1>📊 Model comparison — medical entity extraction</h1>
-<p class="lead">Same 97-case clinical dataset (easy → expert), one harness. Quality is
-entity-extraction <strong>F1</strong> (precision/recall, verbosity-robust); cost is real
-token cost. Baseline = zero-shot; +Prompt Eng = few-shot prompting.</p>
+<h1>📊 Model comparison — {html.escape(meta["title"])}</h1>
+<p class="lead">{meta["lead"]}</p>
 {tiles_html}
 {bars}
 {scatter}
@@ -328,15 +379,15 @@ def main() -> None:
         )
         return
 
-    render_console(data)
-    for f in _findings(data):
+    render_console(data, args.study)
+    for f in _findings(data, study_meta(args.study)["metric"]):
         console.print(f"  • {f.replace('**', '')}")
 
     DOCS.mkdir(exist_ok=True)
     html_path = DOCS / f"comparison_{args.study}.html"
     md_path = RESULTS / f"comparison_{args.study}.md"
-    html_path.write_text(render_html(data), encoding="utf-8")
-    md_path.write_text(render_markdown(data), encoding="utf-8")
+    html_path.write_text(render_html(data, args.study), encoding="utf-8")
+    md_path.write_text(render_markdown(data, args.study), encoding="utf-8")
     console.print(f"\n[green]HTML:[/green] {html_path}\n[green]Markdown:[/green] {md_path}")
     console.print(f"[cyan]Compared {len(data)} model(s): {', '.join(sorted(data))}[/cyan]")
 

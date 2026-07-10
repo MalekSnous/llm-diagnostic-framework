@@ -1,4 +1,8 @@
-.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal run-medical-study run-rag-study publish publish-only compare-medical
+.PHONY: help install install-dev test test-cov lint format clean docker-build docker-run deploy-modal run-medical-study run-rag-study run-sql-study publish publish-only compare-medical benchmark
+
+# Use the project venv's interpreter when it exists, so `make` works without
+# activating the venv first. Override explicitly with: make PYTHON=python3.11 ...
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 help:
 	@echo "LLM Diagnostic Framework - Available Commands"
@@ -23,6 +27,11 @@ help:
 	@echo "Case studies & publishing:"
 	@echo "  make run-medical-study model=gpt-4o-mini"
 	@echo "  make run-rag-study model=gpt-4o-mini"
+	@echo "  make run-sql-study model=gpt-4o-mini"
+	@echo "  make benchmark models=\"gpt-4o-mini groq/llama-3.1-8b-instant\""
+	@echo "                                  - Run ALL studies for each model, build the"
+	@echo "                                    cross-model comparisons, publish to docs/"
+	@echo "                                    (filter with studies=\"text_to_sql\")"
 	@echo "  make publish model=gpt-4o-mini  - Run studies + publish reports to docs/"
 	@echo "  make publish-only               - Publish existing reports (no re-run)"
 	@echo "  make compare-medical            - Compare gpt-4o/gpt-4o-mini/phi-2/sonnet (medical, no RAG)"
@@ -82,15 +91,15 @@ clean:
 # Diagnostic commands
 diagnose:
 	@echo "Running diagnostic..."
-	python scripts/run_diagnostics.py --task "$(task)" --model "$(model)"
+	$(PYTHON) scripts/run_diagnostics.py --task "$(task)" --model "$(model)"
 
 improve:
 	@echo "Running improvement strategy: $(strategy)"
-	python scripts/run_improvements.py --strategy "$(strategy)" --case-study "$(case)"
+	$(PYTHON) scripts/run_improvements.py --strategy "$(strategy)" --case-study "$(case)"
 
 report:
 	@echo "Generating report..."
-	python scripts/generate_report.py --case-study "$(case)"
+	$(PYTHON) scripts/generate_report.py --case-study "$(case)"
 
 # Docker
 docker-build:
@@ -130,26 +139,30 @@ download-models:
 MODEL ?= gpt-4o-mini
 
 run-medical-study:
-	python case_studies/medical_entity_extraction/run_study.py --model $(or $(model),$(MODEL))
+	$(PYTHON) case_studies/medical_entity_extraction/run_study.py --model $(or $(model),$(MODEL))
 
 run-rag-study:
-	python case_studies/rag_document_qa/run_study.py --model $(or $(model),$(MODEL))
+	$(PYTHON) case_studies/rag_document_qa/run_study.py --model $(or $(model),$(MODEL))
 
-# One command: run both studies for a model, then copy the freshest HTML reports
+run-sql-study:
+	$(PYTHON) case_studies/text_to_sql/run_study.py --model $(or $(model),$(MODEL))
+
+# One command: run all studies for a model, then copy the freshest HTML reports
 # into docs/ and regenerate the landing-page cards. Study failures (e.g. missing
 # API key or RAG extra) are non-fatal so whatever ran still gets published.
 # Usage:  make publish model=gpt-4o-mini
 publish:
-	-python case_studies/medical_entity_extraction/run_study.py --model $(or $(model),$(MODEL))
-	-python case_studies/rag_document_qa/run_study.py --model $(or $(model),$(MODEL))
-	python scripts/publish_reports.py
+	-$(PYTHON) case_studies/medical_entity_extraction/run_study.py --model $(or $(model),$(MODEL))
+	-$(PYTHON) case_studies/rag_document_qa/run_study.py --model $(or $(model),$(MODEL))
+	-$(PYTHON) case_studies/text_to_sql/run_study.py --model $(or $(model),$(MODEL))
+	$(PYTHON) scripts/publish_reports.py
 	@echo ""
 	@echo "Reports published to docs/. Review, then commit & push to deploy Pages:"
 	@echo "    git add docs/ && git commit -m 'Update published reports' && git push"
 
 # Only (re)publish reports that already exist in results/, without re-running.
 publish-only:
-	python scripts/publish_reports.py
+	$(PYTHON) scripts/publish_reports.py
 
 # Compare several models on the medical study in one command (RAG skipped — compare
 # it later). Study failures (missing key, no local model) are non-fatal.
@@ -158,11 +171,39 @@ MEDICAL_MODELS ?= gpt-4o gpt-4o-mini microsoft/phi-2 claude-sonnet-4-6
 compare-medical:
 	@for m in $(or $(models),$(MEDICAL_MODELS)); do \
 	  echo "=== $$m ==="; \
-	  python case_studies/medical_entity_extraction/run_study.py --model $$m --skip-rag || true; \
+	  $(PYTHON) case_studies/medical_entity_extraction/run_study.py --model $$m --skip-rag || true; \
 	done
-	python scripts/compare_models.py --study medical_entity_extraction
+	$(PYTHON) scripts/compare_models.py --study medical_entity_extraction
 	@echo ""
 	@echo "Comparison written to docs/comparison_medical_entity_extraction.html"
+
+# Full benchmark: every model × every benchmarkable study (medical without RAG,
+# text-to-SQL), then rebuild the cross-model comparison for each study that ran
+# and publish everything to docs/. Study failures (missing key, no local model)
+# are non-fatal so the rest of the matrix still runs. Override either axis:
+#   make benchmark models="gpt-4o-mini groq/llama-3.1-8b-instant"
+#   make benchmark models="gpt-4o claude-sonnet-4-6" studies="text_to_sql"
+BENCH_MODELS ?= gpt-4o gpt-4o-mini claude-sonnet-4-6 groq/llama-3.1-8b-instant groq/llama-3.3-70b-versatile
+BENCH_STUDIES ?= medical_entity_extraction text_to_sql
+benchmark:
+	@for m in $(or $(models),$(BENCH_MODELS)); do \
+	  for s in $(or $(studies),$(BENCH_STUDIES)); do \
+	    echo "=== $$m — $$s ==="; \
+	    case $$s in \
+	      medical_entity_extraction) \
+	        $(PYTHON) case_studies/$$s/run_study.py --model $$m --skip-rag || true ;; \
+	      *) \
+	        $(PYTHON) case_studies/$$s/run_study.py --model $$m || true ;; \
+	    esac; \
+	  done; \
+	done
+	@for s in $(or $(studies),$(BENCH_STUDIES)); do \
+	  $(PYTHON) scripts/compare_models.py --study $$s; \
+	done
+	$(PYTHON) scripts/publish_reports.py
+	@echo ""
+	@echo "Benchmarks published to docs/. Review, then commit & push to deploy Pages:"
+	@echo "    git add docs/ results/case_studies/ && git commit -m 'Update benchmarks' && git push"
 
 # GitHub Actions locally (requires act)
 test-ci:

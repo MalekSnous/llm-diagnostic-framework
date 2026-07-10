@@ -47,6 +47,27 @@ def test_prompt_engineering_apply_echo(make_mock_llm_client):
     assert all(r.metrics["accuracy"] == 1.0 for r in results)
 
 
+def test_prompt_engineering_task_specific_examples(make_mock_llm_client):
+    """configure(examples=...) must inject the caller's examples into the prompt."""
+    examples = [
+        "Example question: q1\nExample answer: a1",
+        "Example question: q2\nExample answer: a2",
+    ]
+    test_cases = [TestCase(id="t0", input="Translate this.", expected_output="ok")]
+    client = make_mock_llm_client(response_fn=lambda p: "ok")
+
+    strategy = PromptEngineeringStrategy()
+    config = strategy.configure(technique="few-shot", examples=examples, num_examples=2)
+    strategy.apply(test_cases, _baseline_results(test_cases), config, client)
+
+    prompt_sent = client.calls[0]
+    assert "Example question: q1" in prompt_sent
+    assert "Example question: q2" in prompt_sent
+    assert "Translate this." in prompt_sent
+    # The built-in medical examples must NOT leak into a custom-example task.
+    assert "Patient with diabetes" not in prompt_sent
+
+
 def test_cost_benefit_analysis_runs(make_mock_llm_client):
     test_cases = [TestCase(id="t0", input="q", expected_output="a")]
     client = make_mock_llm_client(response_fn=lambda p: "a")
